@@ -23,26 +23,48 @@ function getBot(): LineBot {
 
     // 處理文字訊息
     bot.onEvent(async (context) => {
-      // 連接到 MongoDB（可選，如果需要儲存資料）
       try {
-        await dbConnect();
+        console.log('Bot event received:', {
+          type: context.event.type,
+          timestamp: new Date().toISOString(),
+        });
+
+        // 連接到 MongoDB（可選，如果需要儲存資料）
+        try {
+          await dbConnect();
+        } catch (error) {
+          console.error('MongoDB connection error:', error);
+        }
+
+        const event = context.event;
+
+        // 處理文字訊息
+        if (event.type === 'message' && event.message.type === 'text') {
+          console.log('Processing text message:', event.message.text);
+          await handleTextMessage(context);
+          console.log('Text message handled successfully');
+        }
+        // 處理 Postback 事件
+        else if (event.type === 'postback') {
+          console.log('Processing postback event:', event.postback?.data);
+          await handlePostback(context);
+          console.log('Postback handled successfully');
+        }
+        // 處理其他事件
+        else {
+          console.log('Processing other event type:', event.type);
+          await context.sendText('收到你的訊息了！');
+        }
       } catch (error) {
-        console.error('MongoDB connection error:', error);
-      }
-
-      const event = context.event;
-
-      // 處理文字訊息
-      if (event.type === 'message' && event.message.type === 'text') {
-        await handleTextMessage(context);
-      }
-      // 處理 Postback 事件
-      else if (event.type === 'postback') {
-        await handlePostback(context);
-      }
-      // 處理其他事件
-      else {
-        await context.sendText('收到你的訊息了！');
+        console.error('Error in bot event handler:', error);
+        console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        // 嘗試發送錯誤訊息給用戶
+        try {
+          await context.sendText('抱歉，處理訊息時發生錯誤。');
+        } catch (sendError) {
+          console.error('Failed to send error message:', sendError);
+        }
+        throw error;
       }
     });
   }

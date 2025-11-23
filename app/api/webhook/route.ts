@@ -37,15 +37,53 @@ export async function POST(request: NextRequest) {
     };
 
     // 使用 Bottender 的 request handler
-    const bot = getBot();
+    console.log('Processing webhook request...', {
+      eventsCount: webhookBody.events?.length || 0,
+      destination: webhookBody.destination,
+    });
+
+    // 檢查環境變數
+    const hasChannelSecret = !!process.env.LINE_CHANNEL_SECRET;
+    const hasAccessToken = !!process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    
+    if (!hasChannelSecret || !hasAccessToken) {
+      console.error('Missing environment variables:', {
+        hasChannelSecret,
+        hasAccessToken,
+      });
+      throw new Error('LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN must be set');
+    }
+
+    console.log('Environment variables check passed');
+
+    let bot;
+    try {
+      bot = getBot();
+      console.log('Bot initialized successfully');
+    } catch (botError) {
+      console.error('Failed to initialize bot:', botError);
+      throw botError;
+    }
+
     const requestHandler = bot.createRequestHandler();
-    await requestHandler(webhookBody, requestContext);
+    
+    try {
+      await requestHandler(webhookBody, requestContext);
+      console.log('Request handler completed successfully');
+    } catch (handlerError) {
+      console.error('Request handler error:', handlerError);
+      throw handlerError;
+    }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error('Webhook error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

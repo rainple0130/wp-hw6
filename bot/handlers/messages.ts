@@ -1,16 +1,20 @@
 import { LineContext } from 'bottender';
 
 export async function handleTextMessage(context: LineContext) {
-  const event = context.event;
-  const text = (event.type === 'message' && event.message.type === 'text' 
-    ? event.message.text 
-    : '').toLowerCase();
+  try {
+    const event = context.event;
+    const text = (event.type === 'message' && event.message.type === 'text' 
+      ? event.message.text 
+      : '').toLowerCase();
 
-  // 基本問候
-  if (text.includes('你好') || text.includes('hello') || text.includes('hi')) {
-    await context.sendText('你好！我是 LINE Chatbot，很高興認識你！');
-    return;
-  }
+    console.log('Handling text message:', { original: event.message.text, lowercased: text });
+
+    // 基本問候
+    if (text.includes('你好') || text.includes('hello') || text.includes('hi')) {
+      console.log('Sending greeting message');
+      await context.sendText('你好！我是 LINE Chatbot，很高興認識你！');
+      return;
+    }
 
   // 選單指令
   if (text.includes('選單') || text.includes('menu')) {
@@ -120,11 +124,17 @@ export async function handleTextMessage(context: LineContext) {
     return;
   }
 
-  // 預設回應 - Echo
-  const messageText = event.type === 'message' && event.message.type === 'text' 
-    ? event.message.text 
-    : '';
-  await context.sendText(`你說了：${messageText}`);
+    // 預設回應 - Echo
+    const messageText = event.type === 'message' && event.message.type === 'text' 
+      ? event.message.text 
+      : '';
+    console.log('Sending echo message:', messageText);
+    await context.sendText(`你說了：${messageText}`);
+  } catch (error) {
+    console.error('Error in handleTextMessage:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    throw error;
+  }
 }
 
 export async function handlePostback(context: LineContext) {
