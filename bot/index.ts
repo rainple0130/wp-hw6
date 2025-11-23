@@ -29,11 +29,16 @@ function getBot(): LineBot {
           timestamp: new Date().toISOString(),
         });
 
-        // 連接到 MongoDB（可選，如果需要儲存資料）
-        try {
-          await dbConnect();
-        } catch (error) {
-          console.error('MongoDB connection error:', error);
+        // 連接到 MongoDB（可選，非阻塞，背景執行）
+        // 如果沒有設定 MONGODB_URI 或連線失敗，不影響 bot 回應
+        // 完全在背景執行，不等待結果
+        if (process.env.MONGODB_URI) {
+          // 使用 setImmediate 確保不阻塞當前執行
+          setImmediate(() => {
+            dbConnect().catch((error) => {
+              // 靜默處理錯誤，不影響 bot
+            });
+          });
         }
 
         const event = context.event;
@@ -58,13 +63,30 @@ function getBot(): LineBot {
       } catch (error) {
         console.error('Error in bot event handler:', error);
         console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-        // 嘗試發送錯誤訊息給用戶
+        
+        // 檢查是否是 LINE API 錯誤
+        const isLineApiError = error instanceof Error && (
+          error.message.includes('socket hang up') ||
+          error.message.includes('ECONNRESET') ||
+          error.message.includes('timeout')
+        );
+
+        if (isLineApiError) {
+          console.error('LINE API connection error, this is usually temporary');
+          // LINE API 錯誤通常是暫時的，不拋出錯誤，讓 webhook 返回成功
+          // 這樣 LINE 不會重試
+          return;
+        }
+
+        // 其他錯誤，嘗試發送錯誤訊息給用戶
         try {
           await context.sendText('抱歉，處理訊息時發生錯誤。');
         } catch (sendError) {
           console.error('Failed to send error message:', sendError);
+          // 如果連錯誤訊息都發送失敗，可能是 LINE API 問題，不拋出錯誤
+          return;
         }
-        throw error;
+        // 不拋出錯誤，讓 webhook 返回成功，避免 LINE 重試
       }
     });
   }
