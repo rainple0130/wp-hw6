@@ -3,16 +3,18 @@ import { LineContext } from 'bottender';
 export async function handleTextMessage(context: LineContext) {
   try {
     const event = context.event;
-    const originalText = event.type === 'message' && event.message.type === 'text' 
-      ? event.message.text 
+    // Bottender 將原始事件包裝在 _rawEvent 中
+    const rawEvent = (event as any)?._rawEvent || event;
+    const originalText = rawEvent.type === 'message' && rawEvent.message?.type === 'text' 
+      ? rawEvent.message.text 
       : '';
     const text = originalText.toLowerCase();
 
     console.log('Handling text message:', { 
       original: originalText, 
       lowercased: text,
-      eventType: event.type,
-      messageType: event.type === 'message' ? event.message?.type : 'N/A'
+      eventType: rawEvent.type,
+      messageType: rawEvent.type === 'message' ? rawEvent.message?.type : 'N/A'
     });
 
     // 基本問候 - 檢查多種可能的寫法
@@ -131,8 +133,8 @@ export async function handleTextMessage(context: LineContext) {
   }
 
     // 預設回應 - Echo
-    const messageText = event.type === 'message' && event.message.type === 'text' 
-      ? event.message.text 
+    const messageText = rawEvent.type === 'message' && rawEvent.message?.type === 'text' 
+      ? rawEvent.message.text 
       : '';
     console.log('Sending echo message:', messageText);
     await context.sendText(`你說了：${messageText}`);
@@ -144,7 +146,10 @@ export async function handleTextMessage(context: LineContext) {
 }
 
 export async function handlePostback(context: LineContext) {
-  const data = context.event.postback?.data || '';
+  const event = context.event;
+  // Bottender 將原始事件包裝在 _rawEvent 中
+  const rawEvent = (event as any)?._rawEvent || event;
+  const data = rawEvent.postback?.data || '';
 
   if (data === 'action=text') {
     await context.sendText('這是一個文字回應範例！');

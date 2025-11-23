@@ -31,12 +31,13 @@ function getBot(): LineBot {
       try {
         const event = context.event;
         
+        // Bottender 將原始事件包裝在 _rawEvent 中
+        const rawEvent = (event as any)?._rawEvent || event;
+        
         console.log('Bot event received:', {
-          type: event?.type,
+          type: rawEvent?.type,
           hasEvent: !!event,
-          eventKeys: event ? Object.keys(event) : [],
-          rawEvent: event ? JSON.stringify(event).substring(0, 300) : 'null',
-          contextKeys: Object.keys(context),
+          hasRawEvent: !!(event as any)?._rawEvent,
           timestamp: new Date().toISOString(),
         });
 
@@ -53,19 +54,19 @@ function getBot(): LineBot {
         }
 
         // 檢查事件是否存在
-        if (!event || !event.type) {
-          console.error('Invalid event structure:', event);
+        if (!rawEvent || !rawEvent.type) {
+          console.error('Invalid event structure:', { event, rawEvent });
           return;
         }
 
         // 處理文字訊息
-        if (event.type === 'message' && event.message.type === 'text') {
-          const messageText = event.message.text || '';
+        if (rawEvent.type === 'message' && rawEvent.message?.type === 'text') {
+          const messageText = rawEvent.message.text || '';
           console.log('Processing text message:', {
             text: messageText,
             length: messageText.length,
-            eventType: event.type,
-            messageType: event.message.type
+            eventType: rawEvent.type,
+            messageType: rawEvent.message.type
           });
           try {
             await handleTextMessage(context);
@@ -81,19 +82,19 @@ function getBot(): LineBot {
           }
         }
         // 處理 Postback 事件
-        else if (event.type === 'postback') {
-          console.log('Processing postback event:', event.postback?.data);
+        else if (rawEvent.type === 'postback') {
+          console.log('Processing postback event:', rawEvent.postback?.data);
           await handlePostback(context);
           console.log('Postback handled successfully');
         }
         // 處理其他類型的訊息（圖片、影片等）
-        else if (event.type === 'message') {
-          console.log('Processing other message type:', event.message?.type);
+        else if (rawEvent.type === 'message') {
+          console.log('Processing other message type:', rawEvent.message?.type);
           await context.sendText('我目前只支援文字訊息，請傳送文字給我！');
         }
         // 處理其他事件（follow, unfollow, join, leave 等）
         else {
-          console.log('Processing other event type:', event.type);
+          console.log('Processing other event type:', rawEvent.type);
           // 不回應這些事件，避免不必要的訊息
         }
       } catch (error) {
