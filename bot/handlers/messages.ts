@@ -3,15 +3,21 @@ import { LineContext } from 'bottender';
 export async function handleTextMessage(context: LineContext) {
   try {
     const event = context.event;
-    const text = (event.type === 'message' && event.message.type === 'text' 
+    const originalText = event.type === 'message' && event.message.type === 'text' 
       ? event.message.text 
-      : '').toLowerCase();
+      : '';
+    const text = originalText.toLowerCase();
 
-    console.log('Handling text message:', { original: event.message.text, lowercased: text });
+    console.log('Handling text message:', { 
+      original: originalText, 
+      lowercased: text,
+      eventType: event.type,
+      messageType: event.type === 'message' ? event.message?.type : 'N/A'
+    });
 
-    // 基本問候
-    if (text.includes('你好') || text.includes('hello') || text.includes('hi')) {
-      console.log('Sending greeting message');
+    // 基本問候 - 檢查多種可能的寫法
+    if (text.includes('你好') || text.includes('hello') || text.includes('hi') || text === 'hello' || text === 'hi') {
+      console.log('Matched greeting pattern, sending greeting message');
       await context.sendText('你好！我是 LINE Chatbot，很高興認識你！');
       return;
     }

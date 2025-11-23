@@ -45,9 +45,25 @@ function getBot(): LineBot {
 
         // 處理文字訊息
         if (event.type === 'message' && event.message.type === 'text') {
-          console.log('Processing text message:', event.message.text);
-          await handleTextMessage(context);
-          console.log('Text message handled successfully');
+          const messageText = event.message.text || '';
+          console.log('Processing text message:', {
+            text: messageText,
+            length: messageText.length,
+            eventType: event.type,
+            messageType: event.message.type
+          });
+          try {
+            await handleTextMessage(context);
+            console.log('Text message handled successfully');
+          } catch (handleError) {
+            console.error('Error in handleTextMessage:', handleError);
+            // 如果 handleTextMessage 出錯，嘗試發送預設回應
+            try {
+              await context.sendText(`你說了：${messageText}`);
+            } catch (sendError) {
+              console.error('Failed to send fallback message:', sendError);
+            }
+          }
         }
         // 處理 Postback 事件
         else if (event.type === 'postback') {
@@ -55,10 +71,15 @@ function getBot(): LineBot {
           await handlePostback(context);
           console.log('Postback handled successfully');
         }
-        // 處理其他事件
+        // 處理其他類型的訊息（圖片、影片等）
+        else if (event.type === 'message') {
+          console.log('Processing other message type:', event.message?.type);
+          await context.sendText('我目前只支援文字訊息，請傳送文字給我！');
+        }
+        // 處理其他事件（follow, unfollow, join, leave 等）
         else {
           console.log('Processing other event type:', event.type);
-          await context.sendText('收到你的訊息了！');
+          // 不回應這些事件，避免不必要的訊息
         }
       } catch (error) {
         console.error('Error in bot event handler:', error);
