@@ -38,8 +38,21 @@ async function dbConnect() {
       })
       .catch((error) => {
         cached.promise = null;
-        // 記錄錯誤但不拋出，讓 bot 可以繼續運作
-        console.error('MongoDB connection failed (non-blocking):', error.message || error);
+        // 記錄詳細錯誤資訊
+        const errorMessage = error.message || String(error);
+        console.error('MongoDB connection failed (non-blocking):', errorMessage);
+        
+        // 提供更詳細的錯誤資訊
+        if (errorMessage.includes('authentication failed')) {
+          console.error('MongoDB 認證失敗，請檢查：');
+          console.error('1. 用戶名和密碼是否正確');
+          console.error('2. 連線字串中的特殊字元是否需要 URL 編碼');
+        } else if (errorMessage.includes('whitelist') || errorMessage.includes('IP')) {
+          console.error('MongoDB IP 白名單問題，請檢查：');
+          console.error('1. Network Access 是否已設定 0.0.0.0/0');
+          console.error('2. 設定後是否已等待 1-2 分鐘讓設定生效');
+        }
+        
         return null; // 返回 null 而不是拋出錯誤
       });
   }

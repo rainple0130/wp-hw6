@@ -142,8 +142,17 @@ yarn dev
 ### MongoDB 連線失敗
 
 - 確認 MONGODB_URI 格式正確
-- 確認 MongoDB Atlas Network Access 設定允許 Vercel IP
+- 確認 MongoDB Atlas Network Access 設定：
+  - **開發/測試環境**：設定 `0.0.0.0/0`（允許所有 IP）
+  - **生產環境**：也可以使用 `0.0.0.0/0`，或只允許特定 IP 範圍
+  - 設定後需等待 1-2 分鐘讓設定生效
 - 確認資料庫使用者名稱和密碼正確
+- 如果密碼包含特殊字元（如 `@`, `#`, `%` 等），需要進行 URL 編碼：
+  - `@` → `%40`
+  - `#` → `%23`
+  - `%` → `%25`
+  - `&` → `%26`
+- **注意**：Vercel 使用 serverless functions，IP 是動態的，無法固定 IP，因此建議使用 `0.0.0.0/0`
 
 ### Bot 沒有回應
 
