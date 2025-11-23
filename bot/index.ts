@@ -21,11 +21,22 @@ function getBot(): LineBot {
       accessToken,
     });
 
+    // 初始化 session store（如果需要，在背景執行）
+    bot.initSessionStore().catch((sessionError) => {
+      console.warn('Session store initialization failed (non-critical):', sessionError);
+    });
+
     // 處理文字訊息
     bot.onEvent(async (context) => {
       try {
+        const event = context.event;
+        
         console.log('Bot event received:', {
-          type: context.event.type,
+          type: event?.type,
+          hasEvent: !!event,
+          eventKeys: event ? Object.keys(event) : [],
+          rawEvent: event ? JSON.stringify(event).substring(0, 300) : 'null',
+          contextKeys: Object.keys(context),
           timestamp: new Date().toISOString(),
         });
 
@@ -41,7 +52,11 @@ function getBot(): LineBot {
           });
         }
 
-        const event = context.event;
+        // 檢查事件是否存在
+        if (!event || !event.type) {
+          console.error('Invalid event structure:', event);
+          return;
+        }
 
         // 處理文字訊息
         if (event.type === 'message' && event.message.type === 'text') {

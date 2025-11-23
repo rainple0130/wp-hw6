@@ -40,6 +40,12 @@ export async function POST(request: NextRequest) {
     console.log('Processing webhook request...', {
       eventsCount: webhookBody.events?.length || 0,
       destination: webhookBody.destination,
+      events: webhookBody.events?.map((e: any) => ({
+        type: e.type,
+        messageType: e.message?.type,
+        text: e.message?.text?.substring(0, 50), // 只記錄前50個字元
+      })),
+      fullBody: JSON.stringify(webhookBody).substring(0, 500), // 記錄完整 body 的前500個字元
     });
 
     // 檢查環境變數
@@ -65,14 +71,25 @@ export async function POST(request: NextRequest) {
       throw botError;
     }
 
+    // 使用 Bottender 的 request handler
     const requestHandler = bot.createRequestHandler();
     
     try {
+      // 確保 webhookBody 格式正確
+      if (!webhookBody.events || webhookBody.events.length === 0) {
+        console.log('No events in webhook body');
+        return NextResponse.json({ success: true }, { status: 200 });
+      }
+
       await requestHandler(webhookBody, requestContext);
       console.log('Request handler completed successfully');
     } catch (handlerError) {
       console.error('Request handler error:', handlerError);
-      throw handlerError;
+      console.error('Error details:', {
+        message: handlerError instanceof Error ? handlerError.message : String(handlerError),
+        stack: handlerError instanceof Error ? handlerError.stack : 'No stack',
+      });
+      // 不拋出錯誤，讓 webhook 返回成功，避免 LINE 重試
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

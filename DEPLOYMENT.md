@@ -134,6 +134,36 @@ yarn dev
 
 ## 疑難排解
 
+### 查看 Vercel 日誌
+
+#### 方法 1：使用 Vercel CLI（推薦）
+```bash
+# 安裝 Vercel CLI（如果還沒安裝）
+yarn global add vercel
+
+# 登入
+vercel login
+
+# 查看即時日誌
+vercel logs --follow
+
+# 查看特定部署的日誌
+vercel logs [deployment-url]
+```
+
+#### 方法 2：使用 Vercel Dashboard
+1. 前往 [Vercel Dashboard](https://vercel.com/dashboard)
+2. 選擇你的專案
+3. 點擊頂部選單的 "Logs" 標籤
+4. 或進入專案 → 點擊右上角的 "View Function Logs"
+
+#### 方法 3：查看部署詳情
+1. 進入專案 → Deployments
+2. 點擊最新的部署
+3. 在部署詳情頁面，應該可以看到：
+   - "Runtime Logs" 或 "Function Logs"
+   - 或點擊右上角的 "View Logs"
+
 ### Webhook 驗證失敗
 
 - 確認 LINE_CHANNEL_SECRET 環境變數設定正確
@@ -156,8 +186,10 @@ yarn dev
 
 ### Bot 沒有回應
 
-- 檢查 Vercel 部署日誌是否有錯誤
-- 確認環境變數都已正確設定
+- 使用 Vercel CLI 查看即時日誌：`vercel logs --follow`
+- 確認環境變數都已正確設定（在 Vercel Dashboard → Settings → Environment Variables）
 - 確認 LINE Webhook 已啟用
+- 確認 LINE Webhook URL 正確：`https://your-app.vercel.app/api/webhook`
+- 確認 LINE Access Token 沒有過期（在 LINE Developers Console 重新產生）
 
 
