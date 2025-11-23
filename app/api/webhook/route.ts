@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
 }
 
 // LINE webhook 需要支援 GET 請求進行驗證
-export async function GET() {
-  return NextResponse.json({ message: 'LINE Webhook is running' });
+export async function GET(request: NextRequest) {
+  const url = request.url;
+  return NextResponse.json({ 
+    message: 'LINE Webhook is running',
+    path: '/api/webhook',
+    url: url,
+    timestamp: new Date().toISOString()
+  });
 }
 
