@@ -41,18 +41,21 @@ function getBot(): LineBot {
           timestamp: new Date().toISOString(),
         });
 
-        // 連接到 MongoDB（阻塞式，等待連線完成）
+        // 連接到 MongoDB（非阻塞，在背景執行）
+        // 避免 MongoDB 連線卡住導致 bot 無法回應
         // 如果沒有設定 MONGODB_URI，跳過連線
         if (process.env.MONGODB_URI) {
-          try {
-            console.log('Connecting to MongoDB (blocking)...');
-            await dbConnect();
-            console.log('MongoDB connection established');
-          } catch (dbError) {
-            console.error('MongoDB connection failed, but continuing bot operation:', dbError);
-            // 即使 MongoDB 連線失敗，也繼續處理 bot 訊息
-            // 這樣 bot 仍然可以回應，只是無法使用資料庫功能
-          }
+          // 在背景執行 MongoDB 連線，不阻塞 bot 回應
+          setImmediate(async () => {
+            try {
+              console.log('Connecting to MongoDB (non-blocking)...');
+              await dbConnect();
+              console.log('MongoDB connection established');
+            } catch (dbError) {
+              console.error('MongoDB connection error (non-blocking):', dbError);
+              // 靜默處理錯誤，不影響 bot 回應
+            }
+          });
         }
 
         // 檢查事件是否存在
@@ -75,11 +78,25 @@ function getBot(): LineBot {
             console.log('Text message handled successfully');
           } catch (handleError) {
             console.error('Error in handleTextMessage:', handleError);
+            // 如果是 LINE API socket hang up，這是暫時的網路問題，不拋出錯誤
+            if (handleError instanceof Error && (
+              handleError.message.includes('socket hang up') ||
+              handleError.message.includes('ECONNRESET')
+            )) {
+              console.warn('LINE API connection error in handleTextMessage, this is usually temporary');
+              // 不拋出錯誤，讓 webhook 返回成功，避免 LINE 重試
+              return;
+            }
             // 如果 handleTextMessage 出錯，嘗試發送預設回應
             try {
               await context.sendText(`你說了：${messageText}`);
             } catch (sendError) {
               console.error('Failed to send fallback message:', sendError);
+              // 如果是 socket hang up，不拋出錯誤
+              if (sendError instanceof Error && sendError.message.includes('socket hang up')) {
+                console.warn('LINE API socket hang up on fallback message, this is usually temporary');
+                return;
+              }
             }
           }
         }

@@ -133,31 +133,43 @@ export async function handleTextMessage(context: LineContext) {
     return;
   }
 
-    // 預設回應 - 先 Echo，再呼叫 GPT
+    // 預設回應 - 先 Echo，再呼叫 Gemini
     const messageText = rawEvent.type === 'message' && rawEvent.message?.type === 'text' 
       ? rawEvent.message.text 
       : '';
     
-    // 開發階段：先 echo 收到的訊息
+    // 開發階段：先 echo 收到的訊息（必須在呼叫 Gemini 前發送）
     console.log('Echoing received message:', messageText);
     try {
       await context.sendText(`收到：${messageText}`);
+      console.log('Echo message sent successfully');
     } catch (echoError) {
       console.error('Failed to send echo message:', echoError);
-      // 如果 echo 失敗，繼續嘗試發送 Gemini 回應
+      // 如果是 socket hang up，可能是 LINE API 暫時問題，繼續處理
+      if (echoError instanceof Error && echoError.message.includes('socket hang up')) {
+        console.warn('LINE API socket hang up on echo, continuing...');
+      } else {
+        // 其他錯誤，記錄但不中斷
+        console.error('Echo error details:', echoError);
+      }
     }
     
     // 呼叫 Gemini API 取得回應
     try {
       console.log('Calling Gemini API...');
       const geminiResponse = await getGeminiResponse(messageText);
-      console.log('Gemini response received:', geminiResponse.substring(0, 100));
+      console.log('Gemini response received, length:', geminiResponse.length);
       
       // 發送 Gemini 回應（使用 try-catch 避免 LINE API 錯誤影響）
       try {
         await context.sendText(geminiResponse);
+        console.log('Gemini response sent successfully');
       } catch (sendError) {
         console.error('Failed to send Gemini response:', sendError);
+        // 如果是 socket hang up，記錄但不拋出錯誤
+        if (sendError instanceof Error && sendError.message.includes('socket hang up')) {
+          console.warn('LINE API socket hang up on Gemini response, this is usually temporary');
+        }
         // LINE API 錯誤通常是暫時的，不拋出錯誤避免 webhook 重試
       }
     } catch (geminiError) {
@@ -165,8 +177,13 @@ export async function handleTextMessage(context: LineContext) {
       // 如果 API 失敗，嘗試發送錯誤訊息（但不強制）
       try {
         await context.sendText('抱歉，我暫時無法處理你的訊息。請稍後再試。');
+        console.log('Error message sent successfully');
       } catch (sendError) {
         console.error('Failed to send error message:', sendError);
+        // 如果是 socket hang up，記錄但不拋出錯誤
+        if (sendError instanceof Error && sendError.message.includes('socket hang up')) {
+          console.warn('LINE API socket hang up on error message, this is usually temporary');
+        }
         // 靜默處理，避免 webhook 重試
       }
     }

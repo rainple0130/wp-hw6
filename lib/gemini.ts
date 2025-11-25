@@ -23,13 +23,14 @@ function getGeminiClient(): GoogleGenerativeAI {
  * @param timeoutMs 超時時間（毫秒），預設 30 秒
  * @returns Gemini 回應文字
  */
-export async function getGeminiResponse(message: string, timeoutMs: number = 15000): Promise<string> {
+export async function getGeminiResponse(message: string, timeoutMs: number = 30000): Promise<string> {
   try {
     const client = getGeminiClient();
     
     console.log('Calling Gemini API with model: gemini-2.5-flash');
     
     // 使用 Gemini 2.5 Flash（快速且高效）
+    // 如果模型錯誤，API 會回傳明確的錯誤訊息
     const model = client.getGenerativeModel({ 
       model: 'gemini-2.5-flash',
       generationConfig: {
