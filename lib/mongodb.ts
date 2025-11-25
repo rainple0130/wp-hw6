@@ -26,9 +26,17 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 60000, // 60 秒超時，等待 MongoDB Atlas 免費層集群自動恢復
-      socketTimeoutMS: 60000,
-      connectTimeoutMS: 60000,
+      // 優化連線設定，加快失敗檢測
+      serverSelectionTimeoutMS: 10000, // 10 秒超時，如果集群暫停會更快失敗
+      socketTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      // 減少重試次數，加快失敗
+      maxPoolSize: 1, // 減少連線池大小
+      minPoolSize: 0,
+      // 啟用連線池快取
+      maxIdleTimeMS: 30000, // 30 秒後關閉閒置連線
+      // 快速失敗設定
+      heartbeatFrequencyMS: 10000, // 心跳檢測頻率
     };
 
     console.log('Attempting to connect to MongoDB...');
