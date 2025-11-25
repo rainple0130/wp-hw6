@@ -26,19 +26,22 @@ export async function getGeminiResponse(message: string): Promise<string> {
   try {
     const client = getGeminiClient();
     
-    console.log('Calling Gemini API with model: gemini-1.5-flash');
+    console.log('Calling Gemini API with model: gemini-pro');
     
-    // 使用 Gemini 1.5 Flash（免費且快速）
+    // 使用 Gemini Pro（免費且穩定）
     const model = client.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-pro',
       generationConfig: {
         maxOutputTokens: 500, // 限制回應長度
         temperature: 0.7,
       },
-      systemInstruction: '你是一個友善的 LINE Chatbot 助手，請用簡潔、親切的語氣回應用戶。',
     });
     
-    const result = await model.generateContent(message);
+    // 將系統提示和用戶訊息組合
+    const systemPrompt = '你是一個友善的 LINE Chatbot 助手，請用簡潔、親切的語氣回應用戶。';
+    const fullPrompt = `${systemPrompt}\n\n用戶訊息：${message}`;
+    
+    const result = await model.generateContent(fullPrompt);
     const response = result.response.text() || '抱歉，我無法產生回應。';
     console.log('Gemini API response received, length:', response.length);
     return response;
