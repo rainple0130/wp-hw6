@@ -8,7 +8,22 @@ import mongoose from 'mongoose';
 let cached = (global as any).mongoose;
 
 if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
+  cached = (global as any).mongoose = { conn: null, promise: null, listeners: [] };
+}
+
+/**
+ * MongoDB 連線狀態監聽器
+ * 當 MongoDB 連線成功時，會通知所有監聽器
+ */
+export function onMongoConnected(callback: () => void) {
+  if (cached.conn) {
+    // 如果已經連線，立即執行回調
+    callback();
+  } else {
+    // 否則加入監聽器列表
+    cached.listeners = cached.listeners || [];
+    cached.listeners.push(callback);
+  }
 }
 
 /**
@@ -48,6 +63,21 @@ function initMongoConnection() {
     .then((mongoose) => {
       console.log('MongoDB connected successfully (initialized on deployment)');
       cached.conn = mongoose;
+      
+      // 廣播連線成功事件
+      if (cached.listeners && cached.listeners.length > 0) {
+        console.log(`Broadcasting MongoDB connection success to ${cached.listeners.length} listeners`);
+        cached.listeners.forEach((listener: () => void) => {
+          try {
+            listener();
+          } catch (error) {
+            console.error('Error in MongoDB connection listener:', error);
+          }
+        });
+        // 清空監聽器列表
+        cached.listeners = [];
+      }
+      
       return mongoose;
     })
     .catch((error) => {

@@ -18,10 +18,40 @@ export async function handleTextMessage(context: LineContext) {
       messageType: rawEvent.type === 'message' ? rawEvent.message?.type : 'N/A'
     });
 
+    // 開發階段：先 echo 收到的訊息（必須在所有處理前發送）
+    console.log('Echoing received message:', originalText);
+    try {
+      await context.sendText(`收到：${originalText}`);
+      console.log('Echo message sent successfully');
+    } catch (echoError) {
+      console.error('Failed to send echo message:', echoError);
+      // 如果是 socket hang up，可能是 LINE API 暫時問題，繼續處理
+      if (echoError instanceof Error && echoError.message.includes('socket hang up')) {
+        console.warn('LINE API socket hang up on echo, continuing...');
+      } else {
+        // 其他錯誤，記錄但不中斷
+        console.error('Echo error details:', echoError);
+      }
+    }
+
     // 基本問候 - 檢查多種可能的寫法
     if (text.includes('你好') || text.includes('hello') || text.includes('hi') || text === 'hello' || text === 'hi') {
       console.log('Matched greeting pattern, sending greeting message');
       await context.sendText('你好！我是 LINE Chatbot，很高興認識你！');
+      // 問候訊息後也呼叫 Gemini
+      try {
+        console.log('Calling Gemini API for greeting...');
+        const geminiResponse = await getGeminiResponse(originalText);
+        console.log('Gemini response received, length:', geminiResponse.length);
+        try {
+          await context.sendText(geminiResponse);
+          console.log('Gemini response sent successfully');
+        } catch (sendError) {
+          console.error('Failed to send Gemini response:', sendError);
+        }
+      } catch (geminiError) {
+        console.error('Gemini API error:', geminiError);
+      }
       return;
     }
 
@@ -133,26 +163,8 @@ export async function handleTextMessage(context: LineContext) {
     return;
   }
 
-    // 預設回應 - 先 Echo，再呼叫 Gemini
-    const messageText = rawEvent.type === 'message' && rawEvent.message?.type === 'text' 
-      ? rawEvent.message.text 
-      : '';
-    
-    // 開發階段：先 echo 收到的訊息（必須在呼叫 Gemini 前發送）
-    console.log('Echoing received message:', messageText);
-    try {
-      await context.sendText(`收到：${messageText}`);
-      console.log('Echo message sent successfully');
-    } catch (echoError) {
-      console.error('Failed to send echo message:', echoError);
-      // 如果是 socket hang up，可能是 LINE API 暫時問題，繼續處理
-      if (echoError instanceof Error && echoError.message.includes('socket hang up')) {
-        console.warn('LINE API socket hang up on echo, continuing...');
-      } else {
-        // 其他錯誤，記錄但不中斷
-        console.error('Echo error details:', echoError);
-      }
-    }
+    // 預設回應 - 呼叫 Gemini（echo 已在上面發送）
+    const messageText = originalText;
     
     // 呼叫 Gemini API 取得回應
     try {

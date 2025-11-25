@@ -1,6 +1,6 @@
 import { LineBot } from 'bottender';
 import { handleTextMessage, handlePostback } from './handlers/messages';
-import dbConnect from '@/lib/mongodb';
+import dbConnect, { onMongoConnected } from '@/lib/mongodb';
 
 // 使用 lazy initialization 避免建置時檢查環境變數
 let bot: LineBot | null = null;
@@ -25,6 +25,15 @@ function getBot(): LineBot {
     bot.initSessionStore().catch((sessionError) => {
       console.warn('Session store initialization failed (non-critical):', sessionError);
     });
+
+    // 監聽 MongoDB 連線成功事件
+    if (process.env.MONGODB_URI) {
+      onMongoConnected(() => {
+        console.log('MongoDB connection ready - broadcasting to all users');
+        // 這裡可以實作廣播邏輯，例如發送通知給所有用戶
+        // 目前先記錄日誌
+      });
+    }
 
     // 處理文字訊息
     bot.onEvent(async (context) => {
