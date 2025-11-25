@@ -15,6 +15,7 @@ LINE_CHANNEL_SECRET=your_line_channel_secret_here
 LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token_here
 MONGODB_URI=your_mongodb_atlas_connection_string_here
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### 取得 LINE Channel 憑證
@@ -38,6 +39,17 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
    ```
    mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/<dbname>?retryWrites=true&w=majority
    ```
+
+### 取得 Google Gemini API Key
+
+1. 前往 [Google AI Studio](https://aistudio.google.com/)
+2. 使用 Google 帳號登入
+3. 點擊 "Get API Key"
+4. 選擇 "Create API Key in new project" 或使用現有專案
+5. 複製生成的 API Key
+6. 在 Vercel 環境變數中設定 `GEMINI_API_KEY`
+
+**注意**：Gemini API 提供免費額度，適合開發和測試使用。
 
 ## 部署步驟
 
@@ -64,6 +76,7 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
    vercel env add LINE_CHANNEL_ACCESS_TOKEN
    vercel env add MONGODB_URI
    vercel env add NEXT_PUBLIC_APP_URL
+   vercel env add GEMINI_API_KEY
    ```
 
 ### 使用 Vercel Dashboard

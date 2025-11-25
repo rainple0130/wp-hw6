@@ -48,8 +48,9 @@ cp .env.example .env.local
 編輯 `.env.local` 並填入：
 - `LINE_CHANNEL_SECRET`: LINE Channel Secret
 - `LINE_CHANNEL_ACCESS_TOKEN`: LINE Channel Access Token
-- `MONGODB_URI`: MongoDB Atlas 連線字串
+- `MONGODB_URI`: MongoDB Atlas 連線字串（可選）
 - `NEXT_PUBLIC_APP_URL`: 應用程式 URL（本地開發時使用 `http://localhost:3000`）
+- `GEMINI_API_KEY`: Google Gemini API Key（用於 LLM 回應功能）
 
 ### 3. 啟動開發伺服器
 

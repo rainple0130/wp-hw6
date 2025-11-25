@@ -1,4 +1,5 @@
 import { LineContext } from 'bottender';
+import { getGeminiResponse } from '@/lib/gemini';
 
 export async function handleTextMessage(context: LineContext) {
   try {
@@ -132,12 +133,28 @@ export async function handleTextMessage(context: LineContext) {
     return;
   }
 
-    // 預設回應 - Echo
+    // 預設回應 - 先 Echo，再呼叫 GPT
     const messageText = rawEvent.type === 'message' && rawEvent.message?.type === 'text' 
       ? rawEvent.message.text 
       : '';
-    console.log('Sending echo message:', messageText);
-    await context.sendText(`你說了：${messageText}`);
+    
+    // 開發階段：先 echo 收到的訊息
+    console.log('Echoing received message:', messageText);
+    await context.sendText(`收到：${messageText}`);
+    
+    // 呼叫 Gemini API 取得回應
+    try {
+      console.log('Calling Gemini API...');
+      const geminiResponse = await getGeminiResponse(messageText);
+      console.log('Gemini response received:', geminiResponse.substring(0, 100));
+      
+      // 發送 Gemini 回應
+      await context.sendText(geminiResponse);
+    } catch (geminiError) {
+      console.error('Gemini API error:', geminiError);
+      // 如果 API 失敗，發送錯誤訊息
+      await context.sendText('抱歉，我暫時無法處理你的訊息。請稍後再試。');
+    }
   } catch (error) {
     console.error('Error in handleTextMessage:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
