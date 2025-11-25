@@ -26,11 +26,11 @@ export async function getGeminiResponse(message: string): Promise<string> {
   try {
     const client = getGeminiClient();
     
-    console.log('Calling Gemini API with model: gemini-pro');
+    console.log('Calling Gemini API with model: gemini-2.5-flash');
     
     // 使用 Gemini Pro（免費且穩定）
     const model = client.getGenerativeModel({ 
-      model: 'gemini-pro',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         maxOutputTokens: 500, // 限制回應長度
         temperature: 0.7,
