@@ -26,9 +26,9 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 15000, // 15 秒超時，給 MongoDB 更多時間連線
-      socketTimeoutMS: 15000,
-      connectTimeoutMS: 15000,
+      serverSelectionTimeoutMS: 60000, // 60 秒超時，等待 MongoDB Atlas 免費層集群自動恢復
+      socketTimeoutMS: 60000,
+      connectTimeoutMS: 60000,
     };
 
     console.log('Attempting to connect to MongoDB...');
