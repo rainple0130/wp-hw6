@@ -26,11 +26,12 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 3000, // 3 秒超時，更快失敗
-      socketTimeoutMS: 3000,
-      connectTimeoutMS: 3000,
+      serverSelectionTimeoutMS: 15000, // 15 秒超時，給 MongoDB 更多時間連線
+      socketTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
     };
 
+    console.log('Attempting to connect to MongoDB...');
     cached.promise = mongoose.connect(MONGODB_URI, opts)
       .then((mongoose) => {
         console.log('MongoDB connected successfully');
@@ -40,7 +41,7 @@ async function dbConnect() {
         cached.promise = null;
         // 記錄詳細錯誤資訊
         const errorMessage = error.message || String(error);
-        console.error('MongoDB connection failed (non-blocking):', errorMessage);
+        console.error('MongoDB connection failed:', errorMessage);
         
         // 提供更詳細的錯誤資訊
         if (errorMessage.includes('authentication failed')) {
@@ -53,21 +54,19 @@ async function dbConnect() {
           console.error('2. 設定後是否已等待 1-2 分鐘讓設定生效');
         }
         
-        return null; // 返回 null 而不是拋出錯誤
+        // 阻塞模式下，拋出錯誤讓呼叫者知道連線失敗
+        throw error;
       });
   }
 
   try {
     cached.conn = await cached.promise;
-    // 如果連線失敗，promise 會 resolve 為 null
-    if (!cached.conn) {
-      return null;
-    }
+    return cached.conn;
   } catch (e) {
     cached.promise = null;
-    // 不拋出錯誤，讓 bot 可以繼續運作
-    console.error('MongoDB connection error (non-blocking):', e instanceof Error ? e.message : e);
-    return null;
+    // 在阻塞模式下，重新拋出錯誤
+    console.error('MongoDB connection error:', e instanceof Error ? e.message : e);
+    throw e;
   }
 
   return cached.conn;

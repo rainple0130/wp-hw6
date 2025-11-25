@@ -140,7 +140,12 @@ export async function handleTextMessage(context: LineContext) {
     
     // 開發階段：先 echo 收到的訊息
     console.log('Echoing received message:', messageText);
-    await context.sendText(`收到：${messageText}`);
+    try {
+      await context.sendText(`收到：${messageText}`);
+    } catch (echoError) {
+      console.error('Failed to send echo message:', echoError);
+      // 如果 echo 失敗，繼續嘗試發送 Gemini 回應
+    }
     
     // 呼叫 Gemini API 取得回應
     try {
@@ -148,12 +153,22 @@ export async function handleTextMessage(context: LineContext) {
       const geminiResponse = await getGeminiResponse(messageText);
       console.log('Gemini response received:', geminiResponse.substring(0, 100));
       
-      // 發送 Gemini 回應
-      await context.sendText(geminiResponse);
+      // 發送 Gemini 回應（使用 try-catch 避免 LINE API 錯誤影響）
+      try {
+        await context.sendText(geminiResponse);
+      } catch (sendError) {
+        console.error('Failed to send Gemini response:', sendError);
+        // LINE API 錯誤通常是暫時的，不拋出錯誤避免 webhook 重試
+      }
     } catch (geminiError) {
       console.error('Gemini API error:', geminiError);
-      // 如果 API 失敗，發送錯誤訊息
-      await context.sendText('抱歉，我暫時無法處理你的訊息。請稍後再試。');
+      // 如果 API 失敗，嘗試發送錯誤訊息（但不強制）
+      try {
+        await context.sendText('抱歉，我暫時無法處理你的訊息。請稍後再試。');
+      } catch (sendError) {
+        console.error('Failed to send error message:', sendError);
+        // 靜默處理，避免 webhook 重試
+      }
     }
   } catch (error) {
     console.error('Error in handleTextMessage:', error);

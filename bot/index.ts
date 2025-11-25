@@ -41,16 +41,18 @@ function getBot(): LineBot {
           timestamp: new Date().toISOString(),
         });
 
-        // 連接到 MongoDB（可選，非阻塞，背景執行）
-        // 如果沒有設定 MONGODB_URI 或連線失敗，不影響 bot 回應
-        // 完全在背景執行，不等待結果
+        // 連接到 MongoDB（阻塞式，等待連線完成）
+        // 如果沒有設定 MONGODB_URI，跳過連線
         if (process.env.MONGODB_URI) {
-          // 使用 setImmediate 確保不阻塞當前執行
-          setImmediate(() => {
-            dbConnect().catch((error) => {
-              // 靜默處理錯誤，不影響 bot
-            });
-          });
+          try {
+            console.log('Connecting to MongoDB (blocking)...');
+            await dbConnect();
+            console.log('MongoDB connection established');
+          } catch (dbError) {
+            console.error('MongoDB connection failed, but continuing bot operation:', dbError);
+            // 即使 MongoDB 連線失敗，也繼續處理 bot 訊息
+            // 這樣 bot 仍然可以回應，只是無法使用資料庫功能
+          }
         }
 
         // 檢查事件是否存在
