@@ -72,9 +72,50 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 300
     });
     
     const result = await Promise.race([apiCall, timeoutPromise]);
-    const response = result.response.text() || '抱歉，我無法產生回應。';
-    console.log('Gemini API response received, length:', response.length);
-    return response;
+    
+    // 檢查回應是否被安全設定阻擋
+    const responseText = result.response.text();
+    const candidates = result.response.candidates || [];
+    const firstCandidate = candidates[0];
+    const finishReason = firstCandidate?.finishReason;
+    const safetyRatings = firstCandidate?.safetyRatings || [];
+    
+    console.log('Gemini API response received:', {
+      hasText: !!responseText,
+      textLength: responseText?.length || 0,
+      finishReason: finishReason,
+      candidatesCount: candidates.length,
+      safetyRatings: safetyRatings.map((r: any) => ({
+        category: r.category,
+        probability: r.probability,
+      })),
+    });
+    
+    // 如果回應被安全設定阻擋
+    if (finishReason === 'SAFETY') {
+      console.warn('Gemini response was blocked by safety settings');
+      const blockedCategories = safetyRatings
+        .filter((r: any) => r.probability === 'HIGH' || r.probability === 'MEDIUM')
+        .map((r: any) => r.category);
+      console.warn('Blocked categories:', blockedCategories);
+      return '抱歉，我無法回應這個訊息，因為內容可能違反安全政策。請嘗試換個方式表達。';
+    }
+    
+    // 如果回應被引用檢查阻擋
+    if (finishReason === 'RECITATION') {
+      console.warn('Gemini response was blocked by recitation check');
+      return '抱歉，我無法回應這個訊息，因為可能涉及受版權保護的內容。';
+    }
+    
+    // 如果回應為空
+    if (!responseText || responseText.trim().length === 0) {
+      console.warn('Gemini returned empty response, finishReason:', finishReason);
+      return '抱歉，我無法產生回應。請稍後再試。';
+    }
+    
+    console.log('Gemini API response text length:', responseText.length);
+    console.log('Gemini API response preview:', responseText.substring(0, 100));
+    return responseText;
   } catch (error) {
     console.error('Gemini API error:', error);
     console.error('Error details:', error instanceof Error ? error.message : String(error));
