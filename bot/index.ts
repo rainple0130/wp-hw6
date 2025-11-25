@@ -41,22 +41,8 @@ function getBot(): LineBot {
           timestamp: new Date().toISOString(),
         });
 
-        // 連接到 MongoDB（非阻塞，在背景執行）
-        // 避免 MongoDB 連線卡住導致 bot 無法回應
-        // 如果沒有設定 MONGODB_URI，跳過連線
-        if (process.env.MONGODB_URI) {
-          // 在背景執行 MongoDB 連線，不阻塞 bot 回應
-          setImmediate(async () => {
-            try {
-              console.log('Connecting to MongoDB (non-blocking)...');
-              await dbConnect();
-              console.log('MongoDB connection established');
-            } catch (dbError) {
-              console.error('MongoDB connection error (non-blocking):', dbError);
-              // 靜默處理錯誤，不影響 bot 回應
-            }
-          });
-        }
+        // MongoDB 連線已在部署時初始化，這裡不需要再次連線
+        // 如果需要使用資料庫，可以直接使用 dbConnect() 取得已建立的連線
 
         // 檢查事件是否存在
         if (!rawEvent || !rawEvent.type) {

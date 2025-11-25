@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSignature } from '@line/bot-sdk';
 import getBot from '@/bot';
+import dbConnect from '@/lib/mongodb';
+
+// 在模組載入時確保 MongoDB 連線已初始化
+// 這樣可以在部署完成時就建立連線
+if (process.env.MONGODB_URI) {
+  // 非阻塞方式初始化，不等待結果
+  dbConnect().catch((error) => {
+    console.warn('MongoDB connection initialization warning (non-blocking):', error);
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
