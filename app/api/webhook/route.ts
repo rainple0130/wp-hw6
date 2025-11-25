@@ -81,27 +81,64 @@ export async function POST(request: NextRequest) {
       throw botError;
     }
 
+    // 確保 webhookBody 格式正確
+    if (!webhookBody.events || webhookBody.events.length === 0) {
+      console.log('No events in webhook body');
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
     // 使用 Bottender 的 request handler
     const requestHandler = bot.createRequestHandler();
     
-    try {
-      // 確保 webhookBody 格式正確
-      if (!webhookBody.events || webhookBody.events.length === 0) {
-        console.log('No events in webhook body');
-        return NextResponse.json({ success: true }, { status: 200 });
+    // 關鍵修復：快速返回 webhook 響應，然後在背景處理事件
+    // 這樣可以避免訊息塞車，每個事件都能獨立處理
+    const processEvents = async () => {
+      try {
+        // 將每個事件分別處理，避免一個慢的事件阻塞其他事件
+        const eventPromises = webhookBody.events.map(async (event: any) => {
+          const singleEventWebhook = {
+            ...webhookBody,
+            events: [event], // 只包含當前事件
+          };
+          
+          try {
+            await requestHandler(singleEventWebhook, requestContext);
+            console.log(`Event ${event.type} (${event.message?.type || 'N/A'}) processed successfully`);
+          } catch (eventError) {
+            console.error(`Error processing event ${event.type}:`, eventError);
+            console.error('Event error details:', {
+              message: eventError instanceof Error ? eventError.message : String(eventError),
+              stack: eventError instanceof Error ? eventError.stack : 'No stack',
+              eventType: event.type,
+              messageType: event.message?.type,
+            });
+            // 不拋出錯誤，讓其他事件可以繼續處理
+          }
+        });
+        
+        // 並發處理所有事件，但等待所有完成（用 Promise.allSettled 避免一個失敗影響其他）
+        await Promise.allSettled(eventPromises);
+        console.log('All events processed');
+      } catch (handlerError) {
+        console.error('Request handler error:', handlerError);
+        console.error('Error details:', {
+          message: handlerError instanceof Error ? handlerError.message : String(handlerError),
+          stack: handlerError instanceof Error ? handlerError.stack : 'No stack',
+        });
+        // 不拋出錯誤，讓 webhook 返回成功，避免 LINE 重試
       }
+    };
 
-      await requestHandler(webhookBody, requestContext);
-      console.log('Request handler completed successfully');
-    } catch (handlerError) {
-      console.error('Request handler error:', handlerError);
-      console.error('Error details:', {
-        message: handlerError instanceof Error ? handlerError.message : String(handlerError),
-        stack: handlerError instanceof Error ? handlerError.stack : 'No stack',
+    // 在背景處理事件，不阻塞 webhook 響應
+    // 使用 setImmediate 確保響應先返回
+    setImmediate(() => {
+      processEvents().catch((error) => {
+        console.error('Background event processing error:', error);
       });
-      // 不拋出錯誤，讓 webhook 返回成功，避免 LINE 重試
-    }
+    });
 
+    // 立即返回成功響應，讓 LINE 知道我們已收到事件
+    // 實際處理在背景進行
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error('Webhook error:', error);
