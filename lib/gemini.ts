@@ -20,10 +20,10 @@ function getGeminiClient(): GoogleGenerativeAI {
 /**
  * 呼叫 Gemini API 取得回應（帶超時處理）
  * @param message 用戶訊息
- * @param timeoutMs 超時時間（毫秒），預設 30 秒
+ * @param timeoutMs 超時時間（毫秒），預設 120 秒（LLM 需要時間思考）
  * @returns Gemini 回應文字
  */
-export async function getGeminiResponse(message: string, timeoutMs: number = 30000): Promise<string> {
+export async function getGeminiResponse(message: string, timeoutMs: number = 120000): Promise<string> {
   try {
     const client = getGeminiClient();
     
