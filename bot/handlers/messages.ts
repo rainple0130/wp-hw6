@@ -115,7 +115,13 @@ async function handleSyntaxQuery(context: LineContext, query: string) {
  * 處理渲染器請求
  */
 async function handleRender(context: LineContext, latex: string) {
-  console.log('Handling render request:', latex);
+  console.log('🖼️ Handling render request:', latex);
+  
+  // 驗證 LaTeX 輸入
+  if (!latex || latex.trim().length === 0) {
+    await context.sendText('請輸入有效的 LaTeX 數學式。');
+    return;
+  }
   
   try {
     // 取得應用程式 URL（用於建立渲染 API 的完整 URL）
@@ -130,39 +136,65 @@ async function handleRender(context: LineContext, latex: string) {
       }
     }
     
+    // 確保 URL 格式正確
+    if (!appUrl.startsWith('http://') && !appUrl.startsWith('https://')) {
+      appUrl = `https://${appUrl}`;
+    }
+    
     // 建立渲染 API URL
     const renderUrl = `${appUrl}/api/render?latex=${encodeURIComponent(latex)}`;
-    console.log('Render URL:', renderUrl);
+    console.log('🔗 Render URL:', renderUrl);
     
-    // 使用 LINE 的圖片上傳 API 或直接發送圖片 URL
-    // 注意：LINE 需要圖片是可公開訪問的 URL，所以我們需要先上傳圖片
-    // 這裡先使用簡單的方式：告訴使用者如何訪問
+    // 先測試 URL 是否可訪問
+    try {
+      const testResponse = await fetch(renderUrl, { method: 'HEAD' });
+      console.log('✅ Render URL is accessible, status:', testResponse.status);
+      
+      if (!testResponse.ok) {
+        throw new Error(`Render API returned status ${testResponse.status}`);
+      }
+    } catch (urlError) {
+      console.error('❌ Render URL test failed:', urlError);
+      // 繼續嘗試發送，可能只是 HEAD 請求不支援
+    }
     
     // 嘗試直接發送圖片（如果 renderUrl 是可訪問的）
     try {
+      console.log('📤 Attempting to send image via LINE API...');
       await context.sendImage({
         originalContentUrl: renderUrl,
         previewImageUrl: renderUrl,
       });
+      console.log('✅ Image sent successfully');
       await context.sendText(
         `已渲染：${latex}\n\n` +
         `輸入「結束查詢」、「返回」或「主選單」退出渲染模式。`
       );
     } catch (imageError) {
       // 如果無法直接發送圖片，提供 URL
-      console.warn('Failed to send image directly, providing URL:', imageError);
+      console.error('❌ Failed to send image directly:', imageError);
+      const errorMsg = imageError instanceof Error ? imageError.message : String(imageError);
+      console.error('Error details:', errorMsg);
+      
       await context.sendText(
         `已渲染你的 LaTeX：\n${latex}\n\n` +
         `圖片網址：\n${renderUrl}\n\n` +
         `（如果無法顯示圖片，請複製網址到瀏覽器查看）\n\n` +
+        `錯誤訊息：${errorMsg.substring(0, 100)}\n\n` +
         `輸入「結束查詢」、「返回」或「主選單」退出渲染模式。`
       );
     }
   } catch (error) {
-    console.error('Render error:', error);
+    console.error('❌ Render error:', error);
+    const errorMsg = error instanceof Error ? error.message : '未知錯誤';
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
     await context.sendText(
-      `渲染失敗：${error instanceof Error ? error.message : '未知錯誤'}\n\n` +
-      `請確認 LaTeX 語法是否正確。\n\n` +
+      `渲染失敗：${errorMsg}\n\n` +
+      `請確認：\n` +
+      `1. LaTeX 語法是否正確\n` +
+      `2. 是否包含數學模式符號（$...$ 或 $$...$$）\n` +
+      `3. 範例：$x^2 + y^2 = r^2$\n\n` +
       `輸入「結束查詢」、「返回」或「主選單」退出渲染模式。`
     );
   }

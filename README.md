@@ -4,8 +4,8 @@
 
 ## LINE Bot 資訊
 
-- **LINE ID**: `@@628pirna` （請填入你的 LINE Bot ID）
-- **部署連結**: https://hw6-test.vercel.app （請填入你的 Vercel 部署連結）
+- **LINE ID**: `@628pirna`
+- **部署連結**: https://hw6-test.vercel.app
 - **Webhook URL**: https://hw6-test.vercel.app/api/webhook
 
 ## 技術棧

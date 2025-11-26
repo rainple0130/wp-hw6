@@ -86,20 +86,35 @@ export async function renderLatexToPng(
   const finalHeight = scaledHeight + padding * 2;
 
   // 方法 1: 先將原始 SVG 轉換為 PNG，然後添加背景和 padding
-  // 建立原始 SVG（不包含背景）
-  const originalSvg = svgElement.outerHTML;
-  const originalSvgBuffer = Buffer.from(originalSvg, 'utf-8');
+  // 建立完整的 SVG（包含正確的尺寸和命名空間）
+  const svgWithSize = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${scaledWidth}" height="${scaledHeight}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  ${svgElement.innerHTML}
+</svg>`;
+  
+  const originalSvgBuffer = Buffer.from(svgWithSize, 'utf-8');
 
   // 先將 SVG 轉換為 PNG（使用較高的解析度）
-  const tempPng = await sharp(originalSvgBuffer, {
-    density: 300,
-  })
-    .resize(Math.ceil(scaledWidth), Math.ceil(scaledHeight), {
-      fit: 'contain',
-      background: { r: 0, g: 0, b: 0, alpha: 0 }, // 透明背景
+  let tempPng: Buffer;
+  try {
+    tempPng = await sharp(originalSvgBuffer, {
+      density: 300,
     })
-    .png()
-    .toBuffer();
+      .resize(Math.ceil(scaledWidth), Math.ceil(scaledHeight), {
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 }, // 透明背景
+      })
+      .png()
+      .toBuffer();
+  } catch (sharpError) {
+    console.error('Sharp conversion error:', sharpError);
+    // 如果 sharp 轉換失敗，嘗試使用原始 SVG 尺寸
+    tempPng = await sharp(originalSvgBuffer, {
+      density: 300,
+    })
+      .png()
+      .toBuffer();
+  }
 
   // 解析背景顏色
   let bgColor: { r: number; g: number; b: number; alpha: number };
