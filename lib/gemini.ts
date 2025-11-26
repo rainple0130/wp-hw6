@@ -27,176 +27,52 @@ function getGeminiModel() {
 }
 
 /**
- * 呼叫 Gemini API 取得回應（帶超時處理）
+ * 呼叫 Gemini API 取得回應
  * @param message 用戶訊息
- * @param timeoutMs 超時時間（毫秒），預設 120 秒（LLM 需要時間思考）
  * @returns Gemini 回應文字
  */
-export async function getGeminiResponse(message: string, timeoutMs: number = 120000): Promise<string> {
+export async function getGeminiResponse(message: string): Promise<string> {
   try {
     const model = getGeminiModel();
     
-    console.log(`Calling Gemini API with model: ${DEFAULT_MODEL}`);
-    
-    // 將系統提示和用戶訊息組合
     const systemPrompt = '你是一個友善的 LINE Chatbot 助手，請用簡潔、親切的語氣回應用戶。';
     const fullPrompt = `${systemPrompt}\n\n用戶訊息：${message}`;
     
-    console.log('Sending request to Gemini API...');
-    console.log('Message length:', message.length);
-    console.log('Full prompt length:', fullPrompt.length);
+    console.log(`[Gemini] Calling API with model: ${DEFAULT_MODEL}`);
     
-    // 使用標準方式（與 client.ts 相同）
-    console.log('📤 Creating generateContent call...');
-    const apiCall = model.generateContent(fullPrompt);
-    console.log('✅ generateContent call created');
-    console.log('apiCall type:', typeof apiCall);
-    console.log('Is Promise:', apiCall instanceof Promise);
+    // 正確的 SDK 使用方式（與 client.ts 相同）
+    // 1. await generateContent() 取得 result
+    const result = await model.generateContent(fullPrompt);
     
-    // 暫時不使用 Promise.race，直接 await 測試
-    // 這樣可以確認是否是 Promise.race 的問題
-    const startTime = Date.now();
-    console.log('⏳ Starting direct await, waiting for response...');
-    console.log('⏳ Start time:', new Date().toISOString());
+    // 2. await result.response 取得 response（這是關鍵！）
+    const response = await result.response;
     
-    // 加入定時日誌，確認程式是否仍在執行
-    const progressInterval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      console.log(`⏳ Still waiting... (${(elapsed / 1000).toFixed(1)}s elapsed)`);
-    }, 5000); // 每 5 秒記錄一次
+    // 3. 呼叫 .text() 取得文字
+    const text = response.text();
     
-    let result;
-    try {
-      // 直接 await，不使用 Promise.race
-      result = await apiCall;
-      clearInterval(progressInterval); // 清除定時器
-      
-      const elapsedTime = Date.now() - startTime;
-      console.log(`✅ generateContent completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
-      console.log('✅ Result received, type:', typeof result);
-      console.log('✅ Result keys:', result ? Object.keys(result) : []);
-      console.log('✅ Result structure:', JSON.stringify({
-        hasResult: !!result,
-        hasResponse: !!(result as any)?.response,
-        hasCandidates: !!(result as any)?.candidates,
-      }));
-    } catch (awaitError) {
-      clearInterval(progressInterval); // 清除定時器
-      
-      const elapsedTime = Date.now() - startTime;
-      console.error(`❌ generateContent failed after ${elapsedTime}ms:`, awaitError);
-      console.error('Error type:', awaitError?.constructor?.name);
-      console.error('Error message:', awaitError instanceof Error ? awaitError.message : String(awaitError));
-      throw awaitError;
-    }
-    
-    // 詳細記錄 result 的結構
-    console.log('📊 Result structure:', {
-      hasResult: !!result,
-      resultType: typeof result,
-      resultKeys: result ? Object.keys(result) : [],
-      hasResponse: !!(result as any)?.response,
-      hasCandidates: !!(result as any)?.candidates,
-    });
-    
-    // 嘗試多種方式取得回應
-    let responseText: string = '';
-    
-    try {
-      // 方式 1：標準方式（與 client.ts 相同）
-      console.log('🔍 Attempting to get response via result.response...');
-      const response = (result as any).response;
-      
-      if (response) {
-        console.log('✅ Response object found');
-        console.log('Response type:', typeof response);
-        console.log('Response keys:', Object.keys(response || {}));
-        
-        // 檢查 response 是否是 Promise
-        if (response instanceof Promise) {
-          console.log('⚠️  response is a Promise, awaiting...');
-          const awaitedResponse = await response;
-          responseText = awaitedResponse.text();
-          console.log('✅ Got response text via await Promise');
-        } else {
-          // response 是同步物件
-          responseText = response.text();
-          console.log('✅ Got response text via synchronous call');
-        }
-      } else {
-        throw new Error('result.response is undefined');
-      }
-    } catch (error1) {
-      console.error('❌ Method 1 failed:', error1);
-      
-      try {
-        // 方式 2：直接從 result.candidates 取得（根據 API 回應格式）
-        console.log('🔍 Attempting to get response via candidates...');
-        const candidates = (result as any).candidates;
-        
-        if (candidates && candidates.length > 0) {
-          const firstCandidate = candidates[0];
-          if (firstCandidate.content && firstCandidate.content.parts) {
-            responseText = firstCandidate.content.parts
-              .map((p: any) => p.text || '')
-              .join('');
-            console.log('✅ Got response text via candidates');
-          } else {
-            throw new Error('Candidate structure invalid');
-          }
-        } else {
-          throw new Error('No candidates found');
-        }
-      } catch (error2) {
-        console.error('❌ Method 2 also failed:', error2);
-        throw new Error(`無法取得 Gemini 回應：${error1 instanceof Error ? error1.message : String(error1)}`);
-      }
-    }
-    
-    console.log('📝 Gemini API response received:', {
-      hasText: !!responseText,
-      textLength: responseText?.length || 0,
-      textPreview: responseText?.substring(0, 50) || 'N/A',
-    });
-    
-    // 如果回應為空
-    if (!responseText || responseText.trim().length === 0) {
-      console.warn('⚠️  Gemini returned empty response');
+    if (!text || text.trim().length === 0) {
+      console.warn('[Gemini] Empty response received');
       return '抱歉，我無法產生回應。請稍後再試。';
     }
     
-    console.log('✅ Gemini API response text length:', responseText.length);
-    console.log('✅ Gemini API response preview:', responseText.substring(0, 100));
-    return responseText;
+    console.log(`[Gemini] Response received (${text.length} chars)`);
+    return text;
   } catch (error) {
-    console.error('Gemini API error:', error);
-    console.error('Error details:', error instanceof Error ? error.message : String(error));
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('[Gemini] API error:', error instanceof Error ? error.message : String(error));
     
-    // 如果是 fetch failed，可能是網路問題，提供明確訊息
-    if (error instanceof Error && (
-      error.message.includes('fetch failed') ||
-      error.message.includes('ECONNREFUSED') ||
-      error.message.includes('ENOTFOUND') ||
-      error.message.includes('network')
-    )) {
-      console.error('Gemini API network error - connection failed');
-      throw new Error('Gemini API 連線失敗，請檢查網路連線或稍後再試');
+    // 處理常見錯誤
+    if (error instanceof Error) {
+      if (error.message.includes('fetch failed') || 
+          error.message.includes('ECONNREFUSED') || 
+          error.message.includes('ENOTFOUND')) {
+        throw new Error('Gemini API 連線失敗，請檢查網路連線或稍後再試');
+      }
+      
+      if (error.message.includes('404') || error.message.includes('not found')) {
+        throw new Error('Gemini 模型不存在，請檢查模型名稱');
+      }
     }
     
-    // 如果是超時，提供更明確的錯誤訊息
-    if (error instanceof Error && error.message.includes('timeout')) {
-      console.error('Gemini API timeout - request took too long');
-      throw new Error('Gemini API 回應超時，請稍後再試');
-    }
-    
-    // 如果是模型不存在，提供明確錯誤
-    if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
-      console.error('Gemini model not found - check model name');
-      throw new Error('Gemini 模型不存在，請檢查模型名稱');
-    }
-    
-    // 其他錯誤，提供通用錯誤訊息
     throw new Error(`Gemini API 錯誤：${error instanceof Error ? error.message : String(error)}`);
   }
 }
