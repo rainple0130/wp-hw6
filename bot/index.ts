@@ -111,7 +111,14 @@ function getBot(): LineBot {
           console.log('Processing other message type:', rawEvent.message?.type);
           await context.sendText('我目前只支援文字訊息，請傳送文字給我！');
         }
-        // 處理其他事件（follow, unfollow, join, leave 等）
+        // 處理 follow 事件（使用者加入）
+        else if (rawEvent.type === 'follow') {
+          console.log('Processing follow event (user added bot)');
+          const { handleFollow } = await import('./handlers/messages');
+          await handleFollow(context);
+          console.log('Follow event handled successfully');
+        }
+        // 處理其他事件（unfollow, join, leave 等）
         else {
           console.log('Processing other event type:', rawEvent.type);
           // 不回應這些事件，避免不必要的訊息

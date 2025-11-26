@@ -1,273 +1,239 @@
-import { Context, LineContext } from 'bottender';
-import { getGeminiResponse } from '@/lib/gemini';
+import { LineContext } from 'bottender';
+import { queryLatex, formatQueryResult } from '@/lib/latex-query';
 
-async function testGemini(): Promise<string> {
-  return await getGeminiResponse('Testing Gemini');
+/**
+ * 顯示主選單
+ */
+export async function showMainMenu(context: LineContext) {
+  const intro = `📐 LaTeX 數學式語法查詢與渲染工具
+
+歡迎使用！我是你的 LaTeX 助手，可以幫助你：
+1. 查詢 LaTeX 語法
+2. 渲染數學公式為圖片
+3. 數學計算（開發中）
+
+請選擇功能：`;
+
+  await context.sendButtonTemplate(intro, {
+    text: intro,
+    actions: [
+      {
+        type: 'postback',
+        label: '1. 語法查詢',
+        data: 'action=syntax',
+        text: '語法查詢',
+      },
+      {
+        type: 'postback',
+        label: '2. 渲染器',
+        data: 'action=render',
+        text: '渲染器',
+      },
+      {
+        type: 'postback',
+        label: '3. 數學計算',
+        data: 'action=calculate',
+        text: '數學計算',
+      },
+      {
+        type: 'postback',
+        label: '主選單',
+        data: 'action=menu',
+        text: '主選單',
+      },
+    ],
+  });
 }
 
+/**
+ * 處理使用者加入（follow 事件）
+ */
+export async function handleFollow(context: LineContext) {
+  console.log('User followed the bot, showing main menu');
+  await showMainMenu(context);
+}
+
+/**
+ * 處理語法查詢
+ */
+async function handleSyntaxQuery(context: LineContext, query: string) {
+  console.log('Handling syntax query:', query);
+  
+  const result = queryLatex(query);
+  
+  if (result) {
+    const formatted = formatQueryResult(result);
+    await context.sendText(formatted);
+  } else {
+    await context.sendText(
+      `找不到與「${query}」相關的 LaTeX 語法。\n\n` +
+      `提示：\n` +
+      `- 可以輸入中文關鍵字（如「箭頭」、「alpha」）\n` +
+      `- 可以輸入英文關鍵字（如「arrow」、「sum」）\n` +
+      `- 可以直接輸入 LaTeX 命令（如「\\rightarrow」）\n\n` +
+      `輸入「主選單」或「menu」返回主選單。`
+    );
+  }
+}
+
+/**
+ * 處理渲染器請求
+ */
+async function handleRender(context: LineContext, latex: string) {
+  console.log('Handling render request:', latex);
+  
+  try {
+    // 取得應用程式 URL（用於建立渲染 API 的完整 URL）
+    // 在 Vercel 中，使用 VERCEL_URL 環境變數
+    // 在本地開發時，使用 NEXT_PUBLIC_APP_URL 或預設 localhost
+    let appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl) {
+      if (process.env.VERCEL_URL) {
+        appUrl = `https://${process.env.VERCEL_URL}`;
+      } else {
+        appUrl = 'http://localhost:3000';
+      }
+    }
+    
+    // 建立渲染 API URL
+    const renderUrl = `${appUrl}/api/render?latex=${encodeURIComponent(latex)}`;
+    console.log('Render URL:', renderUrl);
+    
+    // 使用 LINE 的圖片上傳 API 或直接發送圖片 URL
+    // 注意：LINE 需要圖片是可公開訪問的 URL，所以我們需要先上傳圖片
+    // 這裡先使用簡單的方式：告訴使用者如何訪問
+    
+    // 嘗試直接發送圖片（如果 renderUrl 是可訪問的）
+    try {
+      await context.sendImage({
+        originalContentUrl: renderUrl,
+        previewImageUrl: renderUrl,
+      });
+      await context.sendText(`已渲染：${latex}`);
+    } catch (imageError) {
+      // 如果無法直接發送圖片，提供 URL
+      console.warn('Failed to send image directly, providing URL:', imageError);
+      await context.sendText(
+        `已渲染你的 LaTeX：\n${latex}\n\n` +
+        `圖片網址：\n${renderUrl}\n\n` +
+        `（如果無法顯示圖片，請複製網址到瀏覽器查看）`
+      );
+    }
+  } catch (error) {
+    console.error('Render error:', error);
+    await context.sendText(
+      `渲染失敗：${error instanceof Error ? error.message : '未知錯誤'}\n\n` +
+      `請確認 LaTeX 語法是否正確。`
+    );
+  }
+}
+
+/**
+ * 處理文字訊息
+ */
 export async function handleTextMessage(context: LineContext) {
   try {
     const event = context.event;
-    // Bottender 將原始事件包裝在 _rawEvent 中
     const rawEvent = (event as any)?._rawEvent || event;
     const originalText = rawEvent.type === 'message' && rawEvent.message?.type === 'text' 
       ? rawEvent.message.text 
       : '';
-    const text = originalText.toLowerCase();
+    const text = originalText.toLowerCase().trim();
 
     console.log('🔍 Handling text message:', { 
       original: originalText, 
       lowercased: text,
-      eventType: rawEvent.type,
-      messageType: rawEvent.type === 'message' ? rawEvent.message?.type : 'N/A'
     });
 
-    // 注意：replyToken 只能使用一次，所以我們移除 echo，只回覆 Gemini 回應
-    // DEBUG 特殊語法：直接回應，不呼叫 Gemini
-    const trimmedText = text.trim();
-    console.log('🔍 Checking for DEBUG command, trimmed text:', trimmedText);
-    if (trimmedText.toUpperCase() === 'DEBUG' || trimmedText.toLowerCase() === 'debug') {
-      console.log('✅ DEBUG command detected, sending direct response');
-      try {
-        await context.sendText('DEBUG 模式：機器人正常運作中！\n\n系統狀態：\n- Echo: 正常\n- Gemini API: 已設定\n- MongoDB: 已初始化');
-        console.log('✅ DEBUG response sent successfully');
-      } catch (debugError) {
-        console.error('❌ Failed to send DEBUG response:', debugError);
-        throw debugError;
-      }
+    // DEBUG 命令
+    if (text === 'debug') {
+      await context.sendText('DEBUG 模式：機器人正常運作中！\n\n系統狀態：\n- LaTeX 查詢: 正常\n- 渲染器: 正常\n- MongoDB: 已初始化');
       return;
     }
 
-    if (text.trim().toUpperCase() === 'TEST' || text.trim().toLowerCase() === 'test') {
-      console.log('TEST command detected, sending test response');
-      const response = await testGemini();
-      await context.sendText(response);
+    // 主選單指令
+    if (text === '選單' || text === 'menu' || text === '主選單') {
+      await showMainMenu(context);
       return;
     }
 
-
-    // 基本問候 - 檢查多種可能的寫法
-    if (text.includes('你好') || text.includes('hello') || text.includes('hi') || text === 'hello' || text === 'hi') {
-      console.log('Matched greeting pattern, calling Gemini...');
-      
-      try {
-        const geminiResponse = await getGeminiResponse(originalText);
-        console.log('Gemini response received for greeting, length:', geminiResponse.length);
-        
-        // 只回覆 Gemini 回應（replyToken 只能使用一次）
-        if (geminiResponse && geminiResponse.trim().length > 0) {
-          await context.sendText(geminiResponse);
-          console.log('✅ Gemini response sent successfully for greeting');
-        } else {
-          await context.sendText('你好！我是 LINE Chatbot，很高興認識你！');
-        }
-      } catch (geminiError) {
-        console.error('Gemini API error for greeting:', geminiError);
-        // 只發送問候訊息，不發送錯誤訊息
-        await context.sendText('你好！我是 LINE Chatbot，很高興認識你！');
-      }
-      
+    // 問候語 - 顯示主選單
+    if (text.includes('你好') || text.includes('hello') || text.includes('hi') || 
+        text === 'hello' || text === 'hi' || text === '你好') {
+      await showMainMenu(context);
       return;
     }
 
-  // 選單指令
-  if (text.includes('選單') || text.includes('menu')) {
-    await context.sendButtonTemplate('請選擇一個選項：', {
-      text: '請選擇一個選項：',
-      actions: [
-        {
-          type: 'postback',
-          label: '文字回應',
-          data: 'action=text',
-          text: '文字回應',
-        },
-        {
-          type: 'postback',
-          label: '輪播範例',
-          data: 'action=carousel',
-          text: '輪播範例',
-        },
-        {
-          type: 'uri',
-          label: '開啟網站',
-          uri: 'https://line.me',
-        },
-      ],
-    });
-    return;
-  }
+    // 檢查是否在語法查詢模式（可以根據 session 狀態判斷，這裡簡化處理）
+    // 如果輸入看起來像 LaTeX 命令或查詢關鍵字，進行語法查詢
+    if (text.startsWith('\\') || text.length < 50) {
+      // 可能是 LaTeX 命令或查詢關鍵字
+      await handleSyntaxQuery(context, originalText);
+      return;
+    }
 
-  // 輪播範例
-  if (text.includes('輪播') || text.includes('carousel')) {
-    await context.sendCarouselTemplate('這是輪播範例：', [
-      {
-        thumbnailImageUrl: 'https://via.placeholder.com/300x200',
-        title: '選項 1',
-        text: '這是第一個選項的描述',
-        actions: [
-          {
-            type: 'postback',
-            label: '選擇',
-            data: 'action=option1',
-            text: '你選擇了選項 1',
-          },
-        ],
-      },
-      {
-        thumbnailImageUrl: 'https://via.placeholder.com/300x200',
-        title: '選項 2',
-        text: '這是第二個選項的描述',
-        actions: [
-          {
-            type: 'postback',
-            label: '選擇',
-            data: 'action=option2',
-            text: '你選擇了選項 2',
-          },
-        ],
-      },
-      {
-        thumbnailImageUrl: 'https://via.placeholder.com/300x200',
-        title: '選項 3',
-        text: '這是第三個選項的描述',
-        actions: [
-          {
-            type: 'postback',
-            label: '選擇',
-            data: 'action=option3',
-            text: '你選擇了選項 3',
-          },
-        ],
-      },
-    ]);
-    return;
-  }
+    // 檢查是否包含 LaTeX 語法（簡單判斷：包含 $ 或常見命令）
+    if (originalText.includes('$') || originalText.includes('\\')) {
+      // 可能是渲染請求
+      await handleRender(context, originalText);
+      return;
+    }
 
-  // 快速回覆範例
-  if (text.includes('快速回覆') || text.includes('quick reply')) {
-    await context.sendText('請選擇一個快速回覆選項：', {
-      quickReply: {
-        items: [
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '選項 A',
-              text: '我選擇了選項 A',
-            },
-          },
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '選項 B',
-              text: '我選擇了選項 B',
-            },
-          },
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '選項 C',
-              text: '我選擇了選項 C',
-            },
-          },
-        ],
-      },
-    });
-    return;
-  }
-
-    // 預設回應 - 呼叫 Gemini，然後一次回覆 echo + Gemini 回應
-    const messageText = originalText;
+    // 預設：嘗試語法查詢
+    await handleSyntaxQuery(context, originalText);
     
-    // 呼叫 Gemini API 取得回應
-    try {
-      console.log('[Handler] Calling Gemini API...');
-      console.log('[Handler] Message text:', messageText);
-      const geminiResponse = await getGeminiResponse(messageText);
-      console.log('[Handler] Gemini response received, length:', geminiResponse.length);
-      
-      // 確保回應不為空
-      if (!geminiResponse || geminiResponse.trim().length === 0) {
-        console.warn('Gemini returned empty response, sending fallback message');
-        await context.sendText('抱歉，我無法產生回應。請稍後再試。');
-        return;
-      }
-      
-      // 只回覆 Gemini 回應（replyToken 只能使用一次）
-      await context.sendText(geminiResponse);
-      console.log('✅ Gemini response sent successfully');
-    } catch (geminiError) {
-      console.error('[Handler] ❌ Gemini API error caught');
-      console.error('[Handler] Error type:', geminiError?.constructor?.name);
-      console.error('[Handler] Error message:', geminiError instanceof Error ? geminiError.message : String(geminiError));
-      console.error('[Handler] Error stack:', geminiError instanceof Error ? geminiError.stack : 'No stack');
-      
-      // 如果 API 失敗，發送錯誤訊息
-      try {
-        const errorMessage = geminiError instanceof Error 
-          ? geminiError.message 
-          : 'Gemini API 發生錯誤';
-        await context.sendText(`抱歉，處理你的訊息時發生錯誤：${errorMessage}`);
-        console.log('✅ Error message sent successfully');
-      } catch (sendError) {
-        console.error('Failed to send error message:', sendError);
-        // 如果是 socket hang up，記錄但不拋出錯誤
-        if (sendError instanceof Error && sendError.message.includes('socket hang up')) {
-          console.warn('LINE API socket hang up on error message, this is usually temporary');
-        }
-        // 靜默處理，避免 webhook 重試
-      }
-    }
   } catch (error) {
     console.error('Error in handleTextMessage:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    throw error;
+    try {
+      await context.sendText('抱歉，處理訊息時發生錯誤。請輸入「主選單」返回主選單。');
+    } catch (sendError) {
+      console.error('Failed to send error message:', sendError);
+    }
   }
 }
 
+/**
+ * 處理 Postback 事件
+ */
 export async function handlePostback(context: LineContext) {
   const event = context.event;
-  // Bottender 將原始事件包裝在 _rawEvent 中
   const rawEvent = (event as any)?._rawEvent || event;
   const data = rawEvent.postback?.data || '';
 
-  if (data === 'action=text') {
-    await context.sendText('這是一個文字回應範例！');
-  } else if (data === 'action=carousel') {
-    await context.sendCarouselTemplate('這是輪播範例：', [
-      {
-        thumbnailImageUrl: 'https://via.placeholder.com/300x200',
-        title: '選項 1',
-        text: '這是第一個選項的描述',
-        actions: [
-          {
-            type: 'postback',
-            label: '選擇',
-            data: 'action=option1',
-            text: '你選擇了選項 1',
-          },
-        ],
-      },
-      {
-        thumbnailImageUrl: 'https://via.placeholder.com/300x200',
-        title: '選項 2',
-        text: '這是第二個選項的描述',
-        actions: [
-          {
-            type: 'postback',
-            label: '選擇',
-            data: 'action=option2',
-            text: '你選擇了選項 2',
-          },
-        ],
-      },
-    ]);
-  } else if (data.startsWith('action=option')) {
-    await context.sendText(`你選擇了 ${data.split('=')[1]}`);
+  console.log('Processing postback:', data);
+
+  if (data === 'action=menu') {
+    await showMainMenu(context);
+  } else if (data === 'action=syntax') {
+    await context.sendText(
+      '📚 語法查詢模式\n\n' +
+      '請輸入你要查詢的 LaTeX 語法關鍵字：\n\n' +
+      '範例：\n' +
+      '- 「箭頭」或「arrow」\n' +
+      '- 「alpha」或「阿爾法」\n' +
+      '- 「\\sum」或「求和」\n' +
+      '- 「分數」或「frac」\n\n' +
+      '輸入「主選單」返回主選單。'
+    );
+  } else if (data === 'action=render') {
+    await context.sendText(
+      '🖼️ 渲染器模式\n\n' +
+      '請輸入要渲染的 LaTeX 數學式：\n\n' +
+      '範例：\n' +
+      '- $x^2 + y^2 = r^2$\n' +
+      '- $\\frac{a}{b}$\n' +
+      '- $\\sum_{i=1}^{n} i$\n' +
+      '- $\\int_0^1 x dx$\n\n' +
+      '輸入「主選單」返回主選單。'
+    );
+  } else if (data === 'action=calculate') {
+    await context.sendText(
+      '🧮 數學計算功能\n\n' +
+      '此功能目前開發中，敬請期待！\n\n' +
+      '輸入「主選單」返回主選單。'
+    );
   } else {
-    await context.sendText('收到 postback 事件');
+    await context.sendText('收到 postback 事件，返回主選單。');
+    await showMainMenu(context);
   }
 }
-
