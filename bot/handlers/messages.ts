@@ -13,7 +13,7 @@ async function testGemini(): Promise<string> {
       },
     }
   });
-  console.log(response.text);
+  console.log('Gemini response:', response.text);
   return response.text || '';
 }
 
