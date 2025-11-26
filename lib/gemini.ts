@@ -56,29 +56,31 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
     console.log('apiCall type:', typeof apiCall);
     console.log('Is Promise:', apiCall instanceof Promise);
     
-    // 使用 Promise.race 實現超時
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        console.log('⏱️  Timeout triggered after', timeoutMs, 'ms');
-        reject(new Error(`Gemini API timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-    });
-    
+    // 暫時不使用 Promise.race，直接 await 測試
+    // 這樣可以確認是否是 Promise.race 的問題
     const startTime = Date.now();
-    console.log('⏳ Starting Promise.race, waiting for response...');
+    console.log('⏳ Starting direct await, waiting for response...');
     console.log('⏳ Start time:', new Date().toISOString());
     
     let result;
     try {
-      result = await Promise.race([apiCall, timeoutPromise]);
+      // 直接 await，不使用 Promise.race
+      result = await apiCall;
       const elapsedTime = Date.now() - startTime;
-      console.log(`✅ Promise.race completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
+      console.log(`✅ generateContent completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
       console.log('✅ Result received, type:', typeof result);
       console.log('✅ Result keys:', result ? Object.keys(result) : []);
-    } catch (raceError) {
+      console.log('✅ Result structure:', JSON.stringify({
+        hasResult: !!result,
+        hasResponse: !!(result as any)?.response,
+        hasCandidates: !!(result as any)?.candidates,
+      }));
+    } catch (awaitError) {
       const elapsedTime = Date.now() - startTime;
-      console.error(`❌ Promise.race failed after ${elapsedTime}ms:`, raceError);
-      throw raceError;
+      console.error(`❌ generateContent failed after ${elapsedTime}ms:`, awaitError);
+      console.error('Error type:', awaitError?.constructor?.name);
+      console.error('Error message:', awaitError instanceof Error ? awaitError.message : String(awaitError));
+      throw awaitError;
     }
     
     // 詳細記錄 result 的結構
