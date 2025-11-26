@@ -1,24 +1,9 @@
 import { Context, LineContext } from 'bottender';
 import { getGeminiResponse } from '@/lib/gemini';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 async function testGemini(): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not set');
-  }
-  
-  // 使用穩定的 SDK（與 client.ts 相同的方式）
-  const DEFAULT_MODEL = 'gemini-2.5-flash';
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
-  
-  const result = await model.generateContent('Testing Gemini');
-  const response = await result.response;
-  const text = response.text();
-  
-  console.log('Test Gemini response:', text);
-  return text || '';
+  // 直接使用 getGeminiResponse，它已經使用 REST API
+  return await getGeminiResponse('Testing Gemini');
 }
 
 export async function handleTextMessage(context: LineContext) {
