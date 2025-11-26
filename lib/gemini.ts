@@ -47,21 +47,39 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
     
     console.log('Sending request to Gemini API...');
     console.log('Message length:', message.length);
+    console.log('Full prompt length:', fullPrompt.length);
     
     // 使用標準方式（與 client.ts 相同）
+    console.log('📤 Creating generateContent call...');
     const apiCall = model.generateContent(fullPrompt);
+    console.log('✅ generateContent call created');
+    console.log('apiCall type:', typeof apiCall);
+    console.log('Is Promise:', apiCall instanceof Promise);
     
     // 使用 Promise.race 實現超時
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
+        console.log('⏱️  Timeout triggered after', timeoutMs, 'ms');
         reject(new Error(`Gemini API timeout after ${timeoutMs}ms`));
       }, timeoutMs);
     });
     
     const startTime = Date.now();
-    const result = await Promise.race([apiCall, timeoutPromise]);
-    const elapsedTime = Date.now() - startTime;
-    console.log(`✅ Gemini API call completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
+    console.log('⏳ Starting Promise.race, waiting for response...');
+    console.log('⏳ Start time:', new Date().toISOString());
+    
+    let result;
+    try {
+      result = await Promise.race([apiCall, timeoutPromise]);
+      const elapsedTime = Date.now() - startTime;
+      console.log(`✅ Promise.race completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
+      console.log('✅ Result received, type:', typeof result);
+      console.log('✅ Result keys:', result ? Object.keys(result) : []);
+    } catch (raceError) {
+      const elapsedTime = Date.now() - startTime;
+      console.error(`❌ Promise.race failed after ${elapsedTime}ms:`, raceError);
+      throw raceError;
+    }
     
     // 詳細記錄 result 的結構
     console.log('📊 Result structure:', {
