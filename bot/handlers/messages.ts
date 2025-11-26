@@ -3,13 +3,18 @@ import { getGeminiResponse } from '@/lib/gemini';
 import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({});
-async function testGemini(context: LineContext){
+async function testGemini(): Promise<string> {
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: 'Testing Gemini',
+    config: {
+      thinkingConfig: {
+        thinkingBudget: 0,
+      },
+    }
   });
   console.log(response.text);
-  await context.sendText(response.text || 'Error');
+  return response.text || '';
 }
 
 export async function handleTextMessage(context: LineContext) {
@@ -38,7 +43,8 @@ export async function handleTextMessage(context: LineContext) {
 
     if (text.trim().toUpperCase() === 'TEST' || text.trim().toLowerCase() === 'test') {
       console.log('TEST command detected, sending test response');
-      await testGemini(context);
+      const response = await testGemini();
+      await context.sendText(response);
       return;
     }
 
