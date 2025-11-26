@@ -220,14 +220,12 @@ export async function handleTextMessage(context: LineContext) {
       }
       
       // 發送 Gemini 回應（使用 try-catch 避免 LINE API 錯誤影響）
-      console.log('📤 Attempting to send Gemini response to LINE...');
       try {
         await context.sendText(geminiResponse);
-        console.log('✅ Gemini response sent successfully to LINE');
+        console.log('Gemini response sent successfully');
       } catch (sendError) {
-        console.error('❌ Failed to send Gemini response to LINE:', sendError);
+        console.error('Failed to send Gemini response:', sendError);
         console.error('Send error details:', sendError instanceof Error ? sendError.message : String(sendError));
-        console.error('Send error stack:', sendError instanceof Error ? sendError.stack : 'No stack');
         // 如果是 socket hang up，記錄但不拋出錯誤
         if (sendError instanceof Error && sendError.message.includes('socket hang up')) {
           console.warn('LINE API socket hang up on Gemini response, this is usually temporary');
