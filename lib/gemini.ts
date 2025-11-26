@@ -1,4 +1,6 @@
 // 使用 REST API 直接呼叫，避免 SDK 在 Vercel 環境的 streaming 問題
+import { request } from 'undici';
+
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 export async function getGeminiResponse(message: string): Promise<string> {
@@ -12,7 +14,7 @@ export async function getGeminiResponse(message: string): Promise<string> {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
   
-  const body = {
+  const requestBody = {
     contents: [
       {
         role: 'user',
@@ -23,62 +25,55 @@ export async function getGeminiResponse(message: string): Promise<string> {
 
   console.log('[Gemini] Calling REST API...');
   console.log('[Gemini] URL:', url.substring(0, 100) + '...');
-  console.log('[Gemini] Body length:', JSON.stringify(body).length);
+  console.log('[Gemini] Body length:', JSON.stringify(requestBody).length);
   
   const startTime = Date.now();
   
   // 使用 AbortController 設定 30 秒超時
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.error('[Gemini] ❌ Fetch timeout after 30s, aborting...');
+    console.error('[Gemini] ❌ Request timeout after 30s, aborting...');
     controller.abort();
   }, 30000);
   
-  let response;
+  let responseText: string;
+  let statusCode: number;
+  
   try {
-    console.log('[Gemini] Starting fetch at', new Date().toISOString());
+    console.log('[Gemini] Starting request with undici at', new Date().toISOString());
     
-    // 使用 Promise.race 確保不會永遠卡住
-    const fetchPromise = fetch(url, {
+    const { statusCode: code, body: responseBody } = await request(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
     
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Fetch timeout after 30s'));
-      }, 30000);
-    });
-    
-    response = await Promise.race([fetchPromise, timeoutPromise]);
+    statusCode = code;
     clearTimeout(timeoutId);
     const fetchTime = Date.now() - startTime;
-    console.log(`[Gemini] ✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
-    console.log(`[Gemini] Response headers:`, Object.fromEntries(response.headers.entries()));
+    console.log(`[Gemini] ✅ Request completed in ${fetchTime}ms, status: ${statusCode}`);
+    
+    console.log('[Gemini] Reading response body...');
+    responseText = await responseBody.text();
+    console.log('[Gemini] Response body read, length:', responseText.length);
+    console.log('[Gemini] Response preview:', responseText.substring(0, 200));
   } catch (fetchError) {
     clearTimeout(timeoutId);
     const fetchTime = Date.now() - startTime;
-    console.error(`[Gemini] ❌ Fetch failed after ${fetchTime}ms:`, fetchError instanceof Error ? fetchError.message : String(fetchError));
-    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+    console.error(`[Gemini] ❌ Request failed after ${fetchTime}ms:`, fetchError instanceof Error ? fetchError.message : String(fetchError));
+    if (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('timeout'))) {
       throw new Error('Gemini API 請求超時，請稍後再試');
     }
     throw fetchError;
   }
 
   console.log('[Gemini] Checking response status...');
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[Gemini] ❌ API error (${response.status}):`, errorText.substring(0, 500));
-    throw new Error(`Gemini API error (${response.status}): ${errorText.substring(0, 200)}`);
+  if (statusCode! < 200 || statusCode! >= 300) {
+    console.error(`[Gemini] ❌ API error (${statusCode}):`, responseText.substring(0, 500));
+    throw new Error(`Gemini API error (${statusCode}): ${responseText.substring(0, 200)}`);
   }
 
-  console.log('[Gemini] Reading response body...');
-  const responseText = await response.text();
-  console.log('[Gemini] Response body read, length:', responseText.length);
-  console.log('[Gemini] Response preview:', responseText.substring(0, 200));
-  
   console.log('[Gemini] Parsing JSON response...');
   let data;
   try {
