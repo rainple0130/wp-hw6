@@ -45,23 +45,17 @@ function initMongoConnection() {
 
   const opts = {
     bufferCommands: false,
-    // 優化連線設定，針對 Atlas 優化
-    serverSelectionTimeoutMS: 30000, // 30 秒超時，給 Atlas 更多時間
-    socketTimeoutMS: 45000, // 45 秒 socket 超時
-    connectTimeoutMS: 30000, // 30 秒連線超時
-    // 優化連線池設定
-    maxPoolSize: 10, // 增加連線池大小以支援並發
-    minPoolSize: 1, // 保持至少一個連線
-    // 連線池管理
-    maxIdleTimeMS: 300000, // 5 分鐘後關閉閒置連線（Atlas 免費版會自動暫停，保持連線更久）
-    // 心跳檢測
-    heartbeatFrequencyMS: 10000, // 10 秒心跳檢測
-    // 重試設定
-    retryWrites: true,
-    retryReads: true,
-    // 改善連線穩定性
-    keepAlive: true,
-    keepAliveInitialDelay: 30000,
+    // 優化連線設定，加快失敗檢測
+    serverSelectionTimeoutMS: 10000, // 10 秒超時，如果集群暫停會更快失敗
+    socketTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+    // 減少重試次數，加快失敗
+    maxPoolSize: 1, // 減少連線池大小
+    minPoolSize: 0,
+    // 啟用連線池快取
+    maxIdleTimeMS: 30000, // 30 秒後關閉閒置連線
+    // 快速失敗設定
+    heartbeatFrequencyMS: 10000, // 心跳檢測頻率
   };
 
   console.log('Initializing MongoDB connection on module load...');
@@ -137,23 +131,17 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      // 優化連線設定，針對 Atlas 優化
-      serverSelectionTimeoutMS: 30000, // 30 秒超時，給 Atlas 更多時間
-      socketTimeoutMS: 45000, // 45 秒 socket 超時
-      connectTimeoutMS: 30000, // 30 秒連線超時
-      // 優化連線池設定
-      maxPoolSize: 10, // 增加連線池大小以支援並發
-      minPoolSize: 1, // 保持至少一個連線
-      // 連線池管理
-      maxIdleTimeMS: 300000, // 5 分鐘後關閉閒置連線（Atlas 免費版會自動暫停，保持連線更久）
-      // 心跳檢測
-      heartbeatFrequencyMS: 10000, // 10 秒心跳檢測
-      // 重試設定
-      retryWrites: true,
-      retryReads: true,
-      // 改善連線穩定性
-      keepAlive: true,
-      keepAliveInitialDelay: 30000,
+      // 優化連線設定，加快失敗檢測
+      serverSelectionTimeoutMS: 10000, // 10 秒超時，如果集群暫停會更快失敗
+      socketTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      // 減少重試次數，加快失敗
+      maxPoolSize: 1, // 減少連線池大小
+      minPoolSize: 0,
+      // 啟用連線池快取
+      maxIdleTimeMS: 30000, // 30 秒後關閉閒置連線
+      // 快速失敗設定
+      heartbeatFrequencyMS: 10000, // 心跳檢測頻率
     };
 
     console.log('Attempting to connect to MongoDB (on-demand)...');
