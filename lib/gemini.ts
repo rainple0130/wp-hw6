@@ -22,24 +22,58 @@ export async function getGeminiResponse(message: string): Promise<string> {
   };
 
   console.log('[Gemini] Calling REST API...');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  console.log('[Gemini] URL:', url.substring(0, 100) + '...');
+  console.log('[Gemini] Body length:', JSON.stringify(body).length);
+  
+  const startTime = Date.now();
+  
+  // 使用 AbortController 設定 30 秒超時
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.error('[Gemini] ❌ Fetch timeout after 30s, aborting...');
+    controller.abort();
+  }, 30000);
+  
+  let response;
+  try {
+    console.log('[Gemini] Starting fetch at', new Date().toISOString());
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const fetchTime = Date.now() - startTime;
+    console.log(`[Gemini] ✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
+  } catch (fetchError) {
+    clearTimeout(timeoutId);
+    const fetchTime = Date.now() - startTime;
+    console.error(`[Gemini] ❌ Fetch failed after ${fetchTime}ms:`, fetchError instanceof Error ? fetchError.message : String(fetchError));
+    throw fetchError;
+  }
 
+  console.log('[Gemini] Checking response status...');
   if (!response.ok) {
     const errorText = await response.text();
+    console.error(`[Gemini] ❌ API error (${response.status}):`, errorText.substring(0, 500));
     throw new Error(`Gemini API error (${response.status}): ${errorText.substring(0, 200)}`);
   }
 
+  console.log('[Gemini] Parsing JSON response...');
   const data = await response.json();
+  console.log('[Gemini] JSON parsed, extracting text...');
+  
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  console.log('[Gemini] Text extracted, length:', text?.length || 0);
 
   if (!text || text.trim().length === 0) {
+    console.warn('[Gemini] ⚠️ Empty response');
     return '抱歉，我無法產生回應。請稍後再試。';
   }
 
+  const totalTime = Date.now() - startTime;
+  console.log(`[Gemini] ✅ Success! Total time: ${totalTime}ms`);
   return text;
 }
 
