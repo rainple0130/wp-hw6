@@ -4,7 +4,10 @@
       "maxDuration": 300
     }
   },
-  "installCommand": "NGROK_SKIP_DOWNLOAD=true yarn install",
-  "buildCommand": "yarn build"
+  "installCommand": "yarn install --ignore-scripts",
+  "buildCommand": "yarn build",
+  "env": {
+    "NGROK_SKIP_DOWNLOAD": "1"
+  }
 }
 
