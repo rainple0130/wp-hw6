@@ -3,7 +3,6 @@
     "app/api/webhook/route.ts": {
       "maxDuration": 300
     }
-  },
-  "buildCommand": "NGROK_SKIP_DOWNLOAD=true yarn install && yarn build"
+  }
 }
 
