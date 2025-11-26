@@ -148,9 +148,16 @@ export function queryLatex(query: string): QueryResult[] {
   }
   
   // 4. 在 LaTeX 命令中搜尋（部分匹配）
+  // 過濾掉單一字元的命令（如 ^, _, {, } 等），這些通常是特殊符號而不是有意義的命令
   for (const [latex, unicode] of Object.entries(latexUnicode as Record<string, string>)) {
-    const cmdWithoutBackslash = latex.substring(1).toLowerCase();
-    if (cmdWithoutBackslash.includes(normalizedQuery) || normalizedQuery.includes(cmdWithoutBackslash)) {
+    // 跳過單一字元的命令（除了字母和數字）
+    const cmdWithoutBackslash = latex.substring(1);
+    if (cmdWithoutBackslash.length === 1 && !/^[a-zA-Z0-9]$/.test(cmdWithoutBackslash)) {
+      continue; // 跳過單一特殊字元
+    }
+    
+    const cmdLower = cmdWithoutBackslash.toLowerCase();
+    if (cmdLower.includes(normalizedQuery) || normalizedQuery.includes(cmdLower)) {
       addResult({
         latex,
         unicode,

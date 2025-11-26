@@ -142,21 +142,26 @@ async function handleRender(context: LineContext, latex: string) {
         originalContentUrl: renderUrl,
         previewImageUrl: renderUrl,
       });
-      await context.sendText(`已渲染：${latex}`);
+      await context.sendText(
+        `已渲染：${latex}\n\n` +
+        `輸入「結束查詢」、「返回」或「主選單」退出渲染模式。`
+      );
     } catch (imageError) {
       // 如果無法直接發送圖片，提供 URL
       console.warn('Failed to send image directly, providing URL:', imageError);
       await context.sendText(
         `已渲染你的 LaTeX：\n${latex}\n\n` +
         `圖片網址：\n${renderUrl}\n\n` +
-        `（如果無法顯示圖片，請複製網址到瀏覽器查看）`
+        `（如果無法顯示圖片，請複製網址到瀏覽器查看）\n\n` +
+        `輸入「結束查詢」、「返回」或「主選單」退出渲染模式。`
       );
     }
   } catch (error) {
     console.error('Render error:', error);
     await context.sendText(
       `渲染失敗：${error instanceof Error ? error.message : '未知錯誤'}\n\n` +
-      `請確認 LaTeX 語法是否正確。`
+      `請確認 LaTeX 語法是否正確。\n\n` +
+      `輸入「結束查詢」、「返回」或「主選單」退出渲染模式。`
     );
   }
 }

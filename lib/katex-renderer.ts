@@ -50,38 +50,93 @@ export async function renderLatexToPng(
     throw new Error('無法從 KaTeX 輸出中提取 SVG');
   }
 
-  // 取得 SVG 字串
-  const svgString = svgElement.outerHTML;
-
-  // 使用 sharp 將 SVG 轉換為 PNG
-  // 先取得 SVG 的尺寸
+  // 取得 SVG 的原始尺寸
   const viewBox = svgElement.getAttribute('viewBox');
-  let width = 400;
-  let height = 100;
+  let svgWidth = 400;
+  let svgHeight = 100;
 
   if (viewBox) {
-    const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
-    if (vbWidth && vbHeight) {
-      // 根據字體大小調整尺寸
-      const scale = fontSize / 20;
-      width = Math.ceil(vbWidth * scale) + padding * 2;
-      height = Math.ceil(vbHeight * scale) + padding * 2;
+    const parts = viewBox.split(/\s+/);
+    if (parts.length >= 4) {
+      svgWidth = parseFloat(parts[2]) || svgWidth;
+      svgHeight = parseFloat(parts[3]) || svgHeight;
     }
   }
 
-  // 建立帶有背景的 SVG
-  const svgWithBackground = `
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${width}" height="${height}" fill="${backgroundColor}"/>
-      <g transform="translate(${padding}, ${padding})">
-        ${svgElement.innerHTML}
-      </g>
-    </svg>
-  `;
+  // 檢查 SVG 元素是否有 width 和 height 屬性
+  const svgWidthAttr = svgElement.getAttribute('width');
+  const svgHeightAttr = svgElement.getAttribute('height');
+  
+  if (svgWidthAttr) {
+    const parsed = parseFloat(svgWidthAttr);
+    if (!isNaN(parsed)) svgWidth = parsed;
+  }
+  if (svgHeightAttr) {
+    const parsed = parseFloat(svgHeightAttr);
+    if (!isNaN(parsed)) svgHeight = parsed;
+  }
 
-  // 轉換為 PNG
-  const pngBuffer = await sharp(Buffer.from(svgWithBackground))
+  // 根據字體大小調整 SVG 尺寸
+  const scale = fontSize / 20;
+  const scaledWidth = Math.ceil(svgWidth * scale);
+  const scaledHeight = Math.ceil(svgHeight * scale);
+
+  // 計算最終圖片尺寸（包含 padding）
+  const finalWidth = scaledWidth + padding * 2;
+  const finalHeight = scaledHeight + padding * 2;
+
+  // 方法 1: 先將原始 SVG 轉換為 PNG，然後添加背景和 padding
+  // 建立原始 SVG（不包含背景）
+  const originalSvg = svgElement.outerHTML;
+  const originalSvgBuffer = Buffer.from(originalSvg, 'utf-8');
+
+  // 先將 SVG 轉換為 PNG（使用較高的解析度）
+  const tempPng = await sharp(originalSvgBuffer, {
+    density: 300,
+  })
+    .resize(Math.ceil(scaledWidth), Math.ceil(scaledHeight), {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 }, // 透明背景
+    })
     .png()
+    .toBuffer();
+
+  // 解析背景顏色
+  let bgColor: { r: number; g: number; b: number; alpha: number };
+  if (backgroundColor === '#FFFFFF' || backgroundColor === 'white' || backgroundColor === '#fff') {
+    bgColor = { r: 255, g: 255, b: 255, alpha: 1 };
+  } else if (backgroundColor.startsWith('#')) {
+    // 解析十六進位顏色
+    const hex = backgroundColor.slice(1);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    bgColor = { r, g, b, alpha: 1 };
+  } else {
+    // 預設白色
+    bgColor = { r: 255, g: 255, b: 255, alpha: 1 };
+  }
+
+  // 建立最終的 PNG（添加白底和 padding）
+  const pngBuffer = await sharp({
+    create: {
+      width: finalWidth,
+      height: finalHeight,
+      channels: 4,
+      background: bgColor,
+    },
+  })
+    .composite([
+      {
+        input: tempPng,
+        left: padding,
+        top: padding,
+      },
+    ])
+    .png({
+      quality: 100,
+      compressionLevel: 6,
+    })
     .toBuffer();
 
   return pngBuffer;
