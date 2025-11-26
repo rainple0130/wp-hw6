@@ -1,6 +1,12 @@
-# LINE Chatbot
+# LaTeX 數學式語法查詢與渲染工具
 
-這是一個使用 Next.js、TypeScript、Bottender 和 MongoDB Atlas 建立的 LINE Chatbot 專案。
+這是一個使用 Next.js、TypeScript、Bottender 和 MongoDB Atlas 建立的 LINE Chatbot 專案，提供 LaTeX 數學式語法查詢與渲染功能。
+
+## LINE Bot 資訊
+
+- **LINE ID**: `@@628pirna` （請填入你的 LINE Bot ID）
+- **部署連結**: https://hw6-test.vercel.app （請填入你的 Vercel 部署連結）
+- **Webhook URL**: https://hw6-test.vercel.app/api/webhook
 
 ## 技術棧
 
@@ -77,13 +83,30 @@ https://your-ngrok-url.ngrok.io/api/webhook
 
 ## Bot 功能
 
-目前實作的基本功能：
+### 主要功能
 
-- **文字回應**: 發送 "你好" 或 "hello" 會收到問候訊息
-- **按鈕模板**: 發送 "選單" 或 "menu" 會顯示按鈕選單
-- **輪播模板**: 發送 "輪播" 或 "carousel" 會顯示輪播選單
-- **快速回覆**: 發送 "快速回覆" 或 "quick reply" 會顯示快速回覆選項
-- **Echo 功能**: 發送其他文字會收到 echo 回應
+1. **語法查詢**
+   - 智慧型查詢 LaTeX 語法
+   - 支援中文關鍵字（如「箭頭」、「alpha」）
+   - 支援英文關鍵字（如「arrow」、「sum」）
+   - 支援直接輸入 LaTeX 命令（如「\rightarrow」）
+   - 回傳格式：LaTeX 語法 + Unicode 符號 + 說明
+
+2. **渲染器**
+   - 使用 KaTeX 渲染 LaTeX 數學式
+   - 輸出高解析度 PNG 圖片（300 DPI）
+   - 自動添加白底和 padding
+   - 支援數學模式（$...$ 或 $$...$$）
+
+3. **數學計算**（開發中）
+   - 未來將整合數學計算 API
+
+### 使用方式
+
+- 發送「選單」或「menu」顯示主選單
+- 發送「你好」或「hello」也會顯示主選單
+- 在語法查詢模式中，輸入「結束查詢」、「返回」或「主選單」退出
+- 在渲染器模式中，輸入「結束查詢」、「返回」或「主選單」退出
 
 ## 部署
 

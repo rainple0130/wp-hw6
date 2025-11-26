@@ -64,15 +64,17 @@ function getMode(context: LineContext): string {
 /**
  * 設定用戶模式
  */
-function setMode(context: LineContext, mode: string) {
-  context.setState({ mode });
+async function setMode(context: LineContext, mode: string) {
+  await context.setState({ mode });
+  console.log('✅ Mode set to:', mode);
 }
 
 /**
  * 清除用戶模式（返回預設模式）
  */
-function clearMode(context: LineContext) {
-  context.setState({ mode: 'default' });
+async function clearMode(context: LineContext) {
+  await context.setState({ mode: 'default' });
+  console.log('✅ Mode cleared to default');
 }
 
 /**
@@ -192,14 +194,14 @@ export async function handleTextMessage(context: LineContext) {
 
     // 主選單指令（會清除模式）
     if (text === '選單' || text === 'menu' || text === '主選單') {
-      clearMode(context);
+      await clearMode(context);
       await showMainMenu(context);
       return;
     }
 
     // 結束查詢/返回指令（清除模式並返回主選單）
     if (text === '結束查詢' || text === '結束' || text === '返回' || text === 'exit' || text === 'back') {
-      clearMode(context);
+      await clearMode(context);
       await context.sendText('已退出當前模式，返回主選單。');
       await showMainMenu(context);
       return;
@@ -208,7 +210,7 @@ export async function handleTextMessage(context: LineContext) {
     // 問候語 - 顯示主選單
     if (text.includes('你好') || text.includes('hello') || text.includes('hi') || 
         text === 'hello' || text === 'hi' || text === '你好') {
-      clearMode(context);
+      await clearMode(context);
       await showMainMenu(context);
       return;
     }
@@ -253,10 +255,11 @@ export async function handlePostback(context: LineContext) {
   console.log('Processing postback:', data);
 
   if (data === 'action=menu') {
-    clearMode(context);
+    await clearMode(context);
     await showMainMenu(context);
   } else if (data === 'action=syntax') {
-    setMode(context, 'syntax');
+    await setMode(context, 'syntax');
+    console.log('✅ Syntax mode activated, current mode:', getMode(context));
     await context.sendText(
       '📚 語法查詢模式\n\n' +
       '請輸入你要查詢的 LaTeX 語法關鍵字：\n\n' +
@@ -268,7 +271,8 @@ export async function handlePostback(context: LineContext) {
       '輸入「結束查詢」、「返回」或「主選單」退出查詢模式。'
     );
   } else if (data === 'action=render') {
-    setMode(context, 'render');
+    await setMode(context, 'render');
+    console.log('✅ Render mode activated, current mode:', getMode(context));
     await context.sendText(
       '🖼️ 渲染器模式\n\n' +
       '請輸入要渲染的 LaTeX 數學式：\n\n' +
@@ -280,14 +284,14 @@ export async function handlePostback(context: LineContext) {
       '輸入「結束查詢」、「返回」或「主選單」退出渲染模式。'
     );
   } else if (data === 'action=calculate') {
-    clearMode(context);
+    await clearMode(context);
     await context.sendText(
       '🧮 數學計算功能\n\n' +
       '此功能目前開發中，敬請期待！\n\n' +
       '輸入「主選單」返回主選單。'
     );
   } else {
-    clearMode(context);
+    await clearMode(context);
     await context.sendText('收到 postback 事件，返回主選單。');
     await showMainMenu(context);
   }
