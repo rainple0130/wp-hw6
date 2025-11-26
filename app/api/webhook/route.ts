@@ -91,10 +91,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true }, { status: 200 });
       }
 
+      console.log('📤 Calling requestHandler with events:', webhookBody.events.length);
+      console.log('📤 First event type:', webhookBody.events[0]?.type);
+      console.log('📤 First event message type:', webhookBody.events[0]?.message?.type);
+      console.log('📤 First event message text:', webhookBody.events[0]?.message?.text);
+      
       await requestHandler(webhookBody, requestContext);
-      console.log('Request handler completed successfully');
+      console.log('✅ Request handler completed successfully');
     } catch (handlerError) {
-      console.error('Request handler error:', handlerError);
+      console.error('❌ Request handler error:', handlerError);
       console.error('Error details:', {
         message: handlerError instanceof Error ? handlerError.message : String(handlerError),
         stack: handlerError instanceof Error ? handlerError.stack : 'No stack',

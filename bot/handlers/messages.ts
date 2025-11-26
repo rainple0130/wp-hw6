@@ -31,7 +31,7 @@ export async function handleTextMessage(context: LineContext) {
       : '';
     const text = originalText.toLowerCase();
 
-    console.log('Handling text message:', { 
+    console.log('🔍 Handling text message:', { 
       original: originalText, 
       lowercased: text,
       eventType: rawEvent.type,
@@ -39,9 +39,17 @@ export async function handleTextMessage(context: LineContext) {
     });
 
     // DEBUG 特殊語法：直接回應，不呼叫 Gemini
-    if (text.trim().toUpperCase() === 'DEBUG' || text.trim().toLowerCase() === 'debug') {
-      console.log('DEBUG command detected, sending direct response');
-      await context.sendText('DEBUG 模式：機器人正常運作中！\n\n系統狀態：\n- Echo: 正常\n- Gemini API: 已設定\n- MongoDB: 已初始化');
+    const trimmedText = text.trim();
+    console.log('🔍 Checking for DEBUG command, trimmed text:', trimmedText);
+    if (trimmedText.toUpperCase() === 'DEBUG' || trimmedText.toLowerCase() === 'debug') {
+      console.log('✅ DEBUG command detected, sending direct response');
+      try {
+        await context.sendText('DEBUG 模式：機器人正常運作中！\n\n系統狀態：\n- Echo: 正常\n- Gemini API: 已設定\n- MongoDB: 已初始化');
+        console.log('✅ DEBUG response sent successfully');
+      } catch (debugError) {
+        console.error('❌ Failed to send DEBUG response:', debugError);
+        throw debugError;
+      }
       return;
     }
 

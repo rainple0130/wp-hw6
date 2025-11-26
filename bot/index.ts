@@ -21,6 +21,8 @@ function getBot(): LineBot {
       accessToken,
     });
 
+    console.log('✅ LineBot instance created');
+
     // 初始化 session store（如果需要，在背景執行）
     bot.initSessionStore().catch((sessionError) => {
       console.warn('Session store initialization failed (non-critical):', sessionError);
@@ -36,14 +38,16 @@ function getBot(): LineBot {
     }
 
     // 處理文字訊息
+    console.log('📌 Registering bot.onEvent handler...');
     bot.onEvent(async (context) => {
+      console.log('🎯 bot.onEvent handler triggered!');
       try {
         const event = context.event;
         
         // Bottender 將原始事件包裝在 _rawEvent 中
         const rawEvent = (event as any)?._rawEvent || event;
         
-        console.log('Bot event received:', {
+        console.log('📨 Bot event received:', {
           type: rawEvent?.type,
           hasEvent: !!event,
           hasRawEvent: !!(event as any)?._rawEvent,
@@ -62,15 +66,16 @@ function getBot(): LineBot {
         // 處理文字訊息
         if (rawEvent.type === 'message' && rawEvent.message?.type === 'text') {
           const messageText = rawEvent.message.text || '';
-          console.log('Processing text message:', {
+          console.log('📝 Processing text message:', {
             text: messageText,
             length: messageText.length,
             eventType: rawEvent.type,
             messageType: rawEvent.message.type
           });
           try {
+            console.log('📞 Calling handleTextMessage...');
             await handleTextMessage(context);
-            console.log('Text message handled successfully');
+            console.log('✅ Text message handled successfully');
           } catch (handleError) {
             console.error('Error in handleTextMessage:', handleError);
             // 如果是 LINE API socket hang up，這是暫時的網路問題，不拋出錯誤
