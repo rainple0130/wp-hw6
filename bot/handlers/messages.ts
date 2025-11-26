@@ -2,7 +2,6 @@ import { Context, LineContext } from 'bottender';
 import { getGeminiResponse } from '@/lib/gemini';
 
 async function testGemini(): Promise<string> {
-  // 直接使用 getGeminiResponse，它已經使用 REST API
   return await getGeminiResponse('Testing Gemini');
 }
 
