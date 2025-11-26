@@ -27,18 +27,14 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
   try {
     const client = getGeminiClient();
     
-    console.log('🚀 Starting Gemini API call...');
-    console.log('📝 User message:', message.substring(0, 100));
-    console.log('🔑 API Key exists:', !!process.env.GEMINI_API_KEY);
+    console.log('Calling Gemini API with model: gemini-2.5-flash');
     
-    // 使用 gemini-2.5-flash（用戶明確指定的模型）
-    const modelName = 'gemini-2.5-flash';
-    console.log(`🤖 Using model: ${modelName}`);
-    
+    // 使用 Gemini 2.5 Flash（快速且高效）
+    // 如果模型錯誤，API 會回傳明確的錯誤訊息
     const model = client.getGenerativeModel({ 
-      model: modelName,
+      model: 'gemini-2.5-flash',
       generationConfig: {
-        maxOutputTokens: 2000,
+        maxOutputTokens: 2000, // 提高回應長度限制
         temperature: 0.7,
       },
       safetySettings: [
@@ -65,8 +61,7 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
     const systemPrompt = '你是一個友善的 LINE Chatbot 助手，請用簡潔、親切的語氣回應用戶。';
     const fullPrompt = `${systemPrompt}\n\n用戶訊息：${message}`;
     
-    console.log('📤 Sending request to Gemini API...');
-    console.log('⏱️  Timeout set to:', timeoutMs, 'ms');
+    console.log('Sending request to Gemini API...');
     
     // 使用 Promise.race 實現超時
     const apiCall = model.generateContent(fullPrompt);
@@ -76,9 +71,7 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
       }, timeoutMs);
     });
     
-    console.log('⏳ Waiting for Gemini API response...');
     const result = await Promise.race([apiCall, timeoutPromise]);
-    console.log('✅ Gemini API response received!');
     
     console.log('Gemini API raw result received:', {
       hasResponse: !!result.response,
@@ -133,47 +126,35 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
     console.log('✅✅✅ Gemini API response READY to send, length:', responseText.length);
     return responseText;
   } catch (error) {
-    console.error('❌❌❌ Gemini API ERROR occurred!');
-    console.error('Error type:', error?.constructor?.name || typeof error);
-    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Gemini API error:', error);
+    console.error('Error details:', error instanceof Error ? error.message : String(error));
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
-    // 如果是 GoogleGenerativeAI 錯誤，記錄更多細節
-    if (error && typeof error === 'object' && 'message' in error) {
-      const errorObj = error as any;
-      console.error('Error object keys:', Object.keys(errorObj));
-      if (errorObj.cause) {
-        console.error('Error cause:', errorObj.cause);
-      }
-    }
-    
     // 如果是 fetch failed，可能是網路問題，提供明確訊息
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.includes('fetch failed') ||
-      errorMessage.includes('ECONNREFUSED') ||
-      errorMessage.includes('ENOTFOUND') ||
-      errorMessage.includes('network')
-    ) {
-      console.error('🌐 Gemini API network error - connection failed');
+    if (error instanceof Error && (
+      error.message.includes('fetch failed') ||
+      error.message.includes('ECONNREFUSED') ||
+      error.message.includes('ENOTFOUND') ||
+      error.message.includes('network')
+    )) {
+      console.error('Gemini API network error - connection failed');
       throw new Error('Gemini API 連線失敗，請檢查網路連線或稍後再試');
     }
     
     // 如果是超時，提供更明確的錯誤訊息
-    if (errorMessage.includes('timeout')) {
-      console.error('⏱️  Gemini API timeout - request took too long');
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.error('Gemini API timeout - request took too long');
       throw new Error('Gemini API 回應超時，請稍後再試');
     }
     
     // 如果是模型不存在，提供明確錯誤
-    if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-      console.error('🔍 Gemini model not found - check model name');
+    if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+      console.error('Gemini model not found - check model name');
       throw new Error('Gemini 模型不存在，請檢查模型名稱');
     }
     
     // 其他錯誤，提供通用錯誤訊息
-    console.error('❓ Unknown Gemini API error');
-    throw new Error(`Gemini API 錯誤：${errorMessage}`);
+    throw new Error(`Gemini API 錯誤：${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
