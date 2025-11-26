@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { JSDOM } from 'jsdom';
 import sharp from 'sharp';
 
 /**
@@ -40,21 +41,22 @@ export async function renderLatexToPng(
     strict: false,
   });
 
-  // 從 HTML 中提取 SVG（不使用 JSDOM，直接使用正則表達式）
-  const svgMatch = html.match(/<svg[^>]*>[\s\S]*?<\/svg>/i);
-  if (!svgMatch) {
+  // 使用 JSDOM 解析 HTML 並提取 SVG
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+  const svgElement = document.querySelector('svg');
+
+  if (!svgElement) {
     throw new Error('無法從 KaTeX 輸出中提取 SVG');
   }
 
-  const svgString = svgMatch[0];
-  
-  // 使用正則表達式提取屬性
-  const viewBoxMatch = svgString.match(/viewBox=["']([^"']+)["']/i);
+  // 取得 SVG 的原始尺寸
+  const viewBox = svgElement.getAttribute('viewBox');
   let svgWidth = 400;
   let svgHeight = 100;
 
-  if (viewBoxMatch) {
-    const parts = viewBoxMatch[1].split(/\s+/);
+  if (viewBox) {
+    const parts = viewBox.split(/\s+/);
     if (parts.length >= 4) {
       svgWidth = parseFloat(parts[2]) || svgWidth;
       svgHeight = parseFloat(parts[3]) || svgHeight;
@@ -62,21 +64,17 @@ export async function renderLatexToPng(
   }
 
   // 檢查 SVG 元素是否有 width 和 height 屬性
-  const widthMatch = svgString.match(/width=["']([^"']+)["']/i);
-  const heightMatch = svgString.match(/height=["']([^"']+)["']/i);
+  const svgWidthAttr = svgElement.getAttribute('width');
+  const svgHeightAttr = svgElement.getAttribute('height');
   
-  if (widthMatch) {
-    const parsed = parseFloat(widthMatch[1]);
+  if (svgWidthAttr) {
+    const parsed = parseFloat(svgWidthAttr);
     if (!isNaN(parsed)) svgWidth = parsed;
   }
-  if (heightMatch) {
-    const parsed = parseFloat(heightMatch[1]);
+  if (svgHeightAttr) {
+    const parsed = parseFloat(svgHeightAttr);
     if (!isNaN(parsed)) svgHeight = parsed;
   }
-  
-  // 提取 SVG 內容（移除外層標籤）
-  const svgContentMatch = svgString.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i);
-  const svgContent = svgContentMatch ? svgContentMatch[1] : '';
 
   // 根據字體大小調整 SVG 尺寸
   const scale = fontSize / 20;
@@ -91,7 +89,7 @@ export async function renderLatexToPng(
   // 建立完整的 SVG（包含正確的尺寸和命名空間）
   const svgWithSize = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${scaledWidth}" height="${scaledHeight}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  ${svgContent}
+  ${svgElement.innerHTML}
 </svg>`;
   
   const originalSvgBuffer = Buffer.from(svgWithSize, 'utf-8');
