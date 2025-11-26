@@ -223,9 +223,10 @@ export async function handleTextMessage(context: LineContext) {
     
     // 呼叫 Gemini API 取得回應（等待完成，確保回應能發送）
     try {
-      console.log('Calling Gemini API...');
+      console.log('[Handler] Calling Gemini API...');
+      console.log('[Handler] Message text:', messageText);
       const geminiResponse = await getGeminiResponse(messageText);
-      console.log('Gemini response received, length:', geminiResponse.length);
+      console.log('[Handler] Gemini response received, length:', geminiResponse.length);
       
       // 確保回應不為空
       if (!geminiResponse || geminiResponse.trim().length === 0) {
@@ -252,8 +253,10 @@ export async function handleTextMessage(context: LineContext) {
         // LINE API 錯誤通常是暫時的，不拋出錯誤避免 webhook 重試
       }
     } catch (geminiError) {
-      console.error('Gemini API error:', geminiError);
-      console.error('Error details:', geminiError instanceof Error ? geminiError.message : String(geminiError));
+      console.error('[Handler] ❌ Gemini API error caught');
+      console.error('[Handler] Error type:', geminiError?.constructor?.name);
+      console.error('[Handler] Error message:', geminiError instanceof Error ? geminiError.message : String(geminiError));
+      console.error('[Handler] Error stack:', geminiError instanceof Error ? geminiError.stack : 'No stack');
       
       // 如果 API 失敗，嘗試發送錯誤訊息（但不強制）
       try {
