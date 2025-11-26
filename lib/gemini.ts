@@ -37,19 +37,33 @@ export async function getGeminiResponse(message: string): Promise<string> {
   let response;
   try {
     console.log('[Gemini] Starting fetch at', new Date().toISOString());
-    response = await fetch(url, {
+    
+    // 使用 Promise.race 確保不會永遠卡住
+    const fetchPromise = fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Fetch timeout after 30s'));
+      }, 30000);
+    });
+    
+    response = await Promise.race([fetchPromise, timeoutPromise]);
     clearTimeout(timeoutId);
     const fetchTime = Date.now() - startTime;
     console.log(`[Gemini] ✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
+    console.log(`[Gemini] Response headers:`, Object.fromEntries(response.headers.entries()));
   } catch (fetchError) {
     clearTimeout(timeoutId);
     const fetchTime = Date.now() - startTime;
     console.error(`[Gemini] ❌ Fetch failed after ${fetchTime}ms:`, fetchError instanceof Error ? fetchError.message : String(fetchError));
+    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+      throw new Error('Gemini API 請求超時，請稍後再試');
+    }
     throw fetchError;
   }
 
@@ -60,10 +74,23 @@ export async function getGeminiResponse(message: string): Promise<string> {
     throw new Error(`Gemini API error (${response.status}): ${errorText.substring(0, 200)}`);
   }
 
-  console.log('[Gemini] Parsing JSON response...');
-  const data = await response.json();
-  console.log('[Gemini] JSON parsed, extracting text...');
+  console.log('[Gemini] Reading response body...');
+  const responseText = await response.text();
+  console.log('[Gemini] Response body read, length:', responseText.length);
+  console.log('[Gemini] Response preview:', responseText.substring(0, 200));
   
+  console.log('[Gemini] Parsing JSON response...');
+  let data;
+  try {
+    data = JSON.parse(responseText);
+    console.log('[Gemini] JSON parsed successfully');
+  } catch (parseError) {
+    console.error('[Gemini] ❌ JSON parse error:', parseError);
+    console.error('[Gemini] Response text:', responseText);
+    throw new Error('無法解析 Gemini API 回應');
+  }
+  
+  console.log('[Gemini] Extracting text from response...');
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   console.log('[Gemini] Text extracted, length:', text?.length || 0);
 
