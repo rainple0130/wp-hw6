@@ -1,5 +1,5 @@
 import { LineContext } from 'bottender';
-import { queryLatex, formatQueryResult } from '@/lib/latex-query';
+import { queryLatex, formatQueryResults } from '@/lib/latex-query';
 
 /**
  * 顯示主選單
@@ -54,16 +54,49 @@ export async function handleFollow(context: LineContext) {
 }
 
 /**
+ * 取得用戶當前模式
+ */
+function getMode(context: LineContext): string {
+  const state = context.state as any || {};
+  return (state.mode as string) || 'default';
+}
+
+/**
+ * 設定用戶模式
+ */
+function setMode(context: LineContext, mode: string) {
+  context.setState({ mode });
+}
+
+/**
+ * 清除用戶模式（返回預設模式）
+ */
+function clearMode(context: LineContext) {
+  context.setState({ mode: 'default' });
+}
+
+/**
  * 處理語法查詢
  */
 async function handleSyntaxQuery(context: LineContext, query: string) {
   console.log('Handling syntax query:', query);
   
-  const result = queryLatex(query);
+  const results = queryLatex(query);
   
-  if (result) {
-    const formatted = formatQueryResult(result);
-    await context.sendText(formatted);
+  if (results.length > 0) {
+    const formatted = formatQueryResults(results);
+    // LINE 訊息長度限制為 5000 字元，如果結果太長，分段發送
+    if (formatted.length > 4500) {
+      // 如果結果太長，只顯示前 20 個結果
+      const limitedResults = results.slice(0, 20);
+      const limitedFormatted = formatQueryResults(limitedResults);
+      await context.sendText(
+        limitedFormatted + 
+        `\n\n（顯示前 20 個結果，共找到 ${results.length} 個匹配結果）`
+      );
+    } else {
+      await context.sendText(formatted);
+    }
   } else {
     await context.sendText(
       `找不到與「${query}」相關的 LaTeX 語法。\n\n` +
@@ -71,7 +104,7 @@ async function handleSyntaxQuery(context: LineContext, query: string) {
       `- 可以輸入中文關鍵字（如「箭頭」、「alpha」）\n` +
       `- 可以輸入英文關鍵字（如「arrow」、「sum」）\n` +
       `- 可以直接輸入 LaTeX 命令（如「\\rightarrow」）\n\n` +
-      `輸入「主選單」或「menu」返回主選單。`
+      `輸入「結束查詢」、「返回」或「主選單」退出查詢模式。`
     );
   }
 }
@@ -143,6 +176,7 @@ export async function handleTextMessage(context: LineContext) {
     console.log('🔍 Handling text message:', { 
       original: originalText, 
       lowercased: text,
+      mode: getMode(context),
     });
 
     // DEBUG 命令
@@ -151,8 +185,17 @@ export async function handleTextMessage(context: LineContext) {
       return;
     }
 
-    // 主選單指令
+    // 主選單指令（會清除模式）
     if (text === '選單' || text === 'menu' || text === '主選單') {
+      clearMode(context);
+      await showMainMenu(context);
+      return;
+    }
+
+    // 結束查詢/返回指令（清除模式並返回主選單）
+    if (text === '結束查詢' || text === '結束' || text === '返回' || text === 'exit' || text === 'back') {
+      clearMode(context);
+      await context.sendText('已退出當前模式，返回主選單。');
       await showMainMenu(context);
       return;
     }
@@ -160,27 +203,29 @@ export async function handleTextMessage(context: LineContext) {
     // 問候語 - 顯示主選單
     if (text.includes('你好') || text.includes('hello') || text.includes('hi') || 
         text === 'hello' || text === 'hi' || text === '你好') {
+      clearMode(context);
       await showMainMenu(context);
       return;
     }
 
-    // 檢查是否在語法查詢模式（可以根據 session 狀態判斷，這裡簡化處理）
-    // 如果輸入看起來像 LaTeX 命令或查詢關鍵字，進行語法查詢
-    if (text.startsWith('\\') || text.length < 50) {
-      // 可能是 LaTeX 命令或查詢關鍵字
+    // 根據當前模式處理訊息
+    const currentMode = getMode(context);
+    
+    if (currentMode === 'syntax') {
+      // 語法查詢模式
       await handleSyntaxQuery(context, originalText);
       return;
-    }
-
-    // 檢查是否包含 LaTeX 語法（簡單判斷：包含 $ 或常見命令）
-    if (originalText.includes('$') || originalText.includes('\\')) {
-      // 可能是渲染請求
+    } else if (currentMode === 'render') {
+      // 渲染器模式
       await handleRender(context, originalText);
       return;
+    } else {
+      // 預設模式：顯示主選單提示
+      await context.sendText(
+        '請從主選單選擇功能：\n\n' +
+        '輸入「選單」或「menu」顯示主選單。'
+      );
     }
-
-    // 預設：嘗試語法查詢
-    await handleSyntaxQuery(context, originalText);
     
   } catch (error) {
     console.error('Error in handleTextMessage:', error);
@@ -203,8 +248,10 @@ export async function handlePostback(context: LineContext) {
   console.log('Processing postback:', data);
 
   if (data === 'action=menu') {
+    clearMode(context);
     await showMainMenu(context);
   } else if (data === 'action=syntax') {
+    setMode(context, 'syntax');
     await context.sendText(
       '📚 語法查詢模式\n\n' +
       '請輸入你要查詢的 LaTeX 語法關鍵字：\n\n' +
@@ -213,9 +260,10 @@ export async function handlePostback(context: LineContext) {
       '- 「alpha」或「阿爾法」\n' +
       '- 「\\sum」或「求和」\n' +
       '- 「分數」或「frac」\n\n' +
-      '輸入「主選單」返回主選單。'
+      '輸入「結束查詢」、「返回」或「主選單」退出查詢模式。'
     );
   } else if (data === 'action=render') {
+    setMode(context, 'render');
     await context.sendText(
       '🖼️ 渲染器模式\n\n' +
       '請輸入要渲染的 LaTeX 數學式：\n\n' +
@@ -224,15 +272,17 @@ export async function handlePostback(context: LineContext) {
       '- $\\frac{a}{b}$\n' +
       '- $\\sum_{i=1}^{n} i$\n' +
       '- $\\int_0^1 x dx$\n\n' +
-      '輸入「主選單」返回主選單。'
+      '輸入「結束查詢」、「返回」或「主選單」退出渲染模式。'
     );
   } else if (data === 'action=calculate') {
+    clearMode(context);
     await context.sendText(
       '🧮 數學計算功能\n\n' +
       '此功能目前開發中，敬請期待！\n\n' +
       '輸入「主選單」返回主選單。'
     );
   } else {
+    clearMode(context);
     await context.sendText('收到 postback 事件，返回主選單。');
     await showMainMenu(context);
   }

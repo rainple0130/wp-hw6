@@ -81,23 +81,33 @@ interface QueryResult {
 }
 
 /**
- * 查詢 LaTeX 語法
+ * 查詢 LaTeX 語法（返回所有匹配結果）
  * @param query 使用者輸入的查詢字串
- * @returns 查詢結果，包含 LaTeX 語法、Unicode 符號和說明
+ * @returns 所有匹配的查詢結果陣列
  */
-export function queryLatex(query: string): QueryResult | null {
+export function queryLatex(query: string): QueryResult[] {
   const normalizedQuery = query.trim().toLowerCase();
+  const results: QueryResult[] = [];
+  const seenLatex = new Set<string>(); // 用於去重
+  
+  // 輔助函數：添加結果（避免重複）
+  const addResult = (result: QueryResult) => {
+    if (!seenLatex.has(result.latex)) {
+      seenLatex.add(result.latex);
+      results.push(result);
+    }
+  };
   
   // 1. 直接查詢（如果輸入就是 LaTeX 命令）
   if (normalizedQuery.startsWith('\\')) {
     const latex = normalizedQuery;
     const unicode = (latexUnicode as Record<string, string>)[latex];
     if (unicode) {
-      return {
+      addResult({
         latex,
         unicode,
         description: (latexDescriptions as Record<string, string>)[latex] || '無說明',
-      };
+      });
     }
   }
   
@@ -113,11 +123,11 @@ export function queryLatex(query: string): QueryResult | null {
     for (const cmd of possibleCommands) {
       const unicode = (latexUnicode as Record<string, string>)[cmd];
       if (unicode) {
-        return {
+        addResult({
           latex: cmd,
           unicode,
           description: (latexDescriptions as Record<string, string>)[cmd] || '無說明',
-        };
+        });
       }
     }
   }
@@ -128,11 +138,11 @@ export function queryLatex(query: string): QueryResult | null {
       const cmd = `\\${value}`;
       const unicode = (latexUnicode as Record<string, string>)[cmd];
       if (unicode) {
-        return {
+        addResult({
           latex: cmd,
           unicode,
           description: (latexDescriptions as Record<string, string>)[cmd] || '無說明',
-        };
+        });
       }
     }
   }
@@ -141,21 +151,47 @@ export function queryLatex(query: string): QueryResult | null {
   for (const [latex, unicode] of Object.entries(latexUnicode as Record<string, string>)) {
     const cmdWithoutBackslash = latex.substring(1).toLowerCase();
     if (cmdWithoutBackslash.includes(normalizedQuery) || normalizedQuery.includes(cmdWithoutBackslash)) {
-      return {
+      addResult({
         latex,
         unicode,
         description: (latexDescriptions as Record<string, string>)[latex] || '無說明',
-      };
+      });
     }
   }
   
-  return null;
+  return results;
 }
 
 /**
- * 格式化查詢結果為文字訊息
+ * 格式化單個查詢結果
  */
 export function formatQueryResult(result: QueryResult): string {
   return `LaTeX 語法：\n${result.latex}\n\nUnicode 符號：\n${result.unicode}\n\n說明：\n${result.description}`;
+}
+
+/**
+ * 格式化多個查詢結果為文字訊息
+ */
+export function formatQueryResults(results: QueryResult[]): string {
+  if (results.length === 0) {
+    return '找不到匹配的結果。';
+  }
+  
+  if (results.length === 1) {
+    return formatQueryResult(results[0]);
+  }
+  
+  // 多個結果時，格式化為列表
+  let message = `找到 ${results.length} 個匹配結果：\n\n`;
+  
+  results.forEach((result, index) => {
+    message += `【結果 ${index + 1}】\n`;
+    message += `LaTeX 語法：${result.latex}\n`;
+    message += `Unicode 符號：${result.unicode}\n`;
+    message += `說明：${result.description}\n`;
+    message += '\n';
+  });
+  
+  return message.trim();
 }
 
