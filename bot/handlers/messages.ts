@@ -1,5 +1,16 @@
-import { LineContext } from 'bottender';
+import { Context, LineContext } from 'bottender';
 import { getGeminiResponse } from '@/lib/gemini';
+import { GoogleGenAI } from '@google/genai';
+
+const ai = new GoogleGenAI({});
+async function testGemini(context: LineContext){
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: 'Testing Gemini',
+  });
+  console.log(response.text);
+  await context.sendText(response.text || 'Error');
+}
 
 export async function handleTextMessage(context: LineContext) {
   try {
@@ -22,6 +33,12 @@ export async function handleTextMessage(context: LineContext) {
     if (text.trim().toUpperCase() === 'DEBUG' || text.trim().toLowerCase() === 'debug') {
       console.log('DEBUG command detected, sending direct response');
       await context.sendText('DEBUG 模式：機器人正常運作中！\n\n系統狀態：\n- Echo: 正常\n- Gemini API: 已設定\n- MongoDB: 已初始化');
+      return;
+    }
+
+    if (text.trim().toUpperCase() === 'TEST' || text.trim().toLowerCase() === 'test') {
+      console.log('TEST command detected, sending test response');
+      await testGemini(context);
       return;
     }
 
