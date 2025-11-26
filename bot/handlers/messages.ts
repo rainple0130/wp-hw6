@@ -2,8 +2,8 @@ import { Context, LineContext } from 'bottender';
 import { getGeminiResponse } from '@/lib/gemini';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({});
 async function testGemini(): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: 'Testing Gemini',
