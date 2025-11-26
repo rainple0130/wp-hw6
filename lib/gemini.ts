@@ -1,52 +1,51 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
+// 使用 REST API 直接呼叫，避免 SDK 在 Vercel 環境的 streaming 問題
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
-let geminiClient: GoogleGenerativeAI | null = null;
-let geminiModel: any = null;
-
-function getGeminiModel() {
-  if (!geminiModel) {
-    console.log('[Gemini] Initializing model...');
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error('[Gemini] ❌ GEMINI_API_KEY not set');
-      throw new Error('GEMINI_API_KEY environment variable is not set');
-    }
-    console.log('[Gemini] API key found, creating client...');
-    geminiClient = new GoogleGenerativeAI(apiKey);
-    console.log('[Gemini] Client created, getting model:', DEFAULT_MODEL);
-    geminiModel = geminiClient.getGenerativeModel({ model: DEFAULT_MODEL });
-    console.log('[Gemini] Model obtained successfully');
-  } else {
-    console.log('[Gemini] Using cached model');
-  }
-  return geminiModel;
-}
-
 export async function getGeminiResponse(message: string): Promise<string> {
-  console.log('[Gemini] getGeminiResponse called with message:', message.substring(0, 50));
-  
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+
   const systemPrompt = '你是一個友善的 LINE Chatbot 助手，請用簡潔、親切的語氣回應用戶。';
   const prompt = `${systemPrompt}\n\n用戶訊息：${message}`;
-  
-  console.log('[Gemini] Prompt prepared, length:', prompt.length);
-  console.log('[Gemini] Getting model...');
-  
-  const model = getGeminiModel();
-  console.log('[Gemini] Model obtained, calling generateContent...');
-  
-  const result = await model.generateContent(prompt);
-  console.log('[Gemini] generateContent returned, getting response...');
-  
-  const response = await result.response;
-  console.log('[Gemini] response obtained, calling text()...');
-  
-  const text = response.text();
-  console.log('[Gemini] text() returned, length:', text.length);
 
-  return text || '抱歉，我無法產生回應。請稍後再試。';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
+  
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: prompt }]
+      }
+    ]
+  };
+
+  console.log('[Gemini] Calling REST API...');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${errorText.substring(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!text || text.trim().length === 0) {
+    return '抱歉，我無法產生回應。請稍後再試。';
+  }
+
+  return text;
 }
 
-export { getGeminiModel };
+// 為了向後相容
+export function getGeminiModel() {
+  throw new Error('getGeminiModel() is deprecated. Use getGeminiResponse() directly.');
+}
+
 export default getGeminiResponse;
