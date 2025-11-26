@@ -59,6 +59,9 @@ function initMongoConnection() {
     // 重試設定
     retryWrites: true,
     retryReads: true,
+    // 改善連線穩定性
+    keepAlive: true,
+    keepAliveInitialDelay: 30000,
   };
 
   console.log('Initializing MongoDB connection on module load...');
