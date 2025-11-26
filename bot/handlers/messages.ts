@@ -1,20 +1,24 @@
 import { Context, LineContext } from 'bottender';
 import { getGeminiResponse } from '@/lib/gemini';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 async function testGemini(): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: 'Testing Gemini',
-    config: {
-      thinkingConfig: {
-        thinkingBudget: 0,
-      },
-    }
-  });
-  console.log('Gemini response:', response.text);
-  return response.text || '';
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+  
+  // 使用穩定的 SDK（與 client.ts 相同的方式）
+  const DEFAULT_MODEL = 'gemini-2.5-flash';
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
+  
+  const result = await model.generateContent('Testing Gemini');
+  const response = await result.response;
+  const text = response.text();
+  
+  console.log('Test Gemini response:', text);
+  return text || '';
 }
 
 export async function handleTextMessage(context: LineContext) {

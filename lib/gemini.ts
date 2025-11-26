@@ -1,20 +1,32 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Gemini 模型預設值
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 // 使用 lazy initialization 避免建置時檢查環境變數
-let geminiClient: GoogleGenAI | null = null;
+let geminiClient: GoogleGenerativeAI | null = null;
+let geminiModel: any = null;
 
-function getGeminiClient(): GoogleGenAI {
-  if (!geminiClient) {
+function getGeminiModel() {
+  if (!geminiModel) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is not set');
     }
 
-    geminiClient = new GoogleGenAI({ apiKey });
+    // 使用與 client.ts 相同的穩定方式
+    geminiClient = new GoogleGenerativeAI(apiKey);
+    geminiModel = geminiClient.getGenerativeModel({ 
+      model: DEFAULT_MODEL,
+      generationConfig: {
+        maxOutputTokens: 2000,
+        temperature: 0.7,
+      },
+    });
   }
 
-  return geminiClient;
+  return geminiModel;
 }
 
 /**
@@ -25,25 +37,19 @@ function getGeminiClient(): GoogleGenAI {
  */
 export async function getGeminiResponse(message: string, timeoutMs: number = 120000): Promise<string> {
   try {
-    const client = getGeminiClient();
+    const model = getGeminiModel();
     
-    console.log('Calling Gemini API with model: gemini-2.5-flash');
+    console.log(`Calling Gemini API with model: ${DEFAULT_MODEL}`);
     
     // 將系統提示和用戶訊息組合
     const systemPrompt = '你是一個友善的 LINE Chatbot 助手，請用簡潔、親切的語氣回應用戶。';
     const fullPrompt = `${systemPrompt}\n\n用戶訊息：${message}`;
     
     console.log('Sending request to Gemini API...');
+    console.log('Message length:', message.length);
     
-    // 使用官方新 API 方式
-    const apiCall = client.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: fullPrompt,
-      config: {
-        maxOutputTokens: 2000,
-        temperature: 0.7,
-      },
-    });
+    // 使用標準方式（與 client.ts 相同）
+    const apiCall = model.generateContent(fullPrompt);
     
     // 使用 Promise.race 實現超時
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -52,27 +58,17 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
       }, timeoutMs);
     });
     
-    const response = await Promise.race([apiCall, timeoutPromise]);
+    const startTime = Date.now();
+    const result = await Promise.race([apiCall, timeoutPromise]);
+    const elapsedTime = Date.now() - startTime;
+    console.log(`✅ Gemini API call completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
+    
+    // 使用標準方式取得回應（與 client.ts 相同）
+    const response = await result.response;
+    const responseText = response.text();
     
     console.log('Gemini API response received:', {
       hasResponse: !!response,
-      responseType: typeof response,
-      responseKeys: response ? Object.keys(response) : [],
-    });
-    
-    // 取得回應文字
-    let responseText: string;
-    try {
-      responseText = response.text || '';
-      console.log('Gemini response.text extracted, length:', responseText?.length || 0);
-    } catch (textError) {
-      console.error('Error extracting response.text:', textError);
-      throw new Error(`無法取得 Gemini 回應文字：${textError instanceof Error ? textError.message : String(textError)}`);
-    }
-    
-    // 記錄回應資訊
-    console.log('Gemini API response details:', {
-      hasText: !!responseText,
       textLength: responseText?.length || 0,
       textPreview: responseText?.substring(0, 50) || 'N/A',
     });
@@ -119,5 +115,9 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
   }
 }
 
-export default getGeminiClient;
+// 為了向後相容，保留這個 export（但現在返回 model）
+function getGeminiClient() {
+  return getGeminiModel();
+}
 
+export default getGeminiClient;
