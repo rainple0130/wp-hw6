@@ -15,14 +15,11 @@ function getGeminiModel() {
       throw new Error('GEMINI_API_KEY environment variable is not set');
     }
 
-    // 使用與 client.ts 相同的穩定方式
+    // 使用與 client.ts 完全相同的穩定方式
     geminiClient = new GoogleGenerativeAI(apiKey);
+    // 注意：client.ts 沒有傳入 generationConfig，先保持一致
     geminiModel = geminiClient.getGenerativeModel({ 
       model: DEFAULT_MODEL,
-      generationConfig: {
-        maxOutputTokens: 2000,
-        temperature: 0.7,
-      },
     });
   }
 
@@ -62,10 +59,18 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
     console.log('⏳ Starting direct await, waiting for response...');
     console.log('⏳ Start time:', new Date().toISOString());
     
+    // 加入定時日誌，確認程式是否仍在執行
+    const progressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      console.log(`⏳ Still waiting... (${(elapsed / 1000).toFixed(1)}s elapsed)`);
+    }, 5000); // 每 5 秒記錄一次
+    
     let result;
     try {
       // 直接 await，不使用 Promise.race
       result = await apiCall;
+      clearInterval(progressInterval); // 清除定時器
+      
       const elapsedTime = Date.now() - startTime;
       console.log(`✅ generateContent completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
       console.log('✅ Result received, type:', typeof result);
@@ -76,6 +81,8 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
         hasCandidates: !!(result as any)?.candidates,
       }));
     } catch (awaitError) {
+      clearInterval(progressInterval); // 清除定時器
+      
       const elapsedTime = Date.now() - startTime;
       console.error(`❌ generateContent failed after ${elapsedTime}ms:`, awaitError);
       console.error('Error type:', awaitError?.constructor?.name);
