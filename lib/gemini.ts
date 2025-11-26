@@ -63,24 +63,83 @@ export async function getGeminiResponse(message: string, timeoutMs: number = 120
     const elapsedTime = Date.now() - startTime;
     console.log(`✅ Gemini API call completed in ${elapsedTime}ms (${(elapsedTime / 1000).toFixed(2)}s)`);
     
-    // 使用標準方式取得回應（與 client.ts 相同）
-    const response = await result.response;
-    const responseText = response.text();
+    // 詳細記錄 result 的結構
+    console.log('📊 Result structure:', {
+      hasResult: !!result,
+      resultType: typeof result,
+      resultKeys: result ? Object.keys(result) : [],
+      hasResponse: !!(result as any)?.response,
+      hasCandidates: !!(result as any)?.candidates,
+    });
     
-    console.log('Gemini API response received:', {
-      hasResponse: !!response,
+    // 嘗試多種方式取得回應
+    let responseText: string = '';
+    
+    try {
+      // 方式 1：標準方式（與 client.ts 相同）
+      console.log('🔍 Attempting to get response via result.response...');
+      const response = (result as any).response;
+      
+      if (response) {
+        console.log('✅ Response object found');
+        console.log('Response type:', typeof response);
+        console.log('Response keys:', Object.keys(response || {}));
+        
+        // 檢查 response 是否是 Promise
+        if (response instanceof Promise) {
+          console.log('⚠️  response is a Promise, awaiting...');
+          const awaitedResponse = await response;
+          responseText = awaitedResponse.text();
+          console.log('✅ Got response text via await Promise');
+        } else {
+          // response 是同步物件
+          responseText = response.text();
+          console.log('✅ Got response text via synchronous call');
+        }
+      } else {
+        throw new Error('result.response is undefined');
+      }
+    } catch (error1) {
+      console.error('❌ Method 1 failed:', error1);
+      
+      try {
+        // 方式 2：直接從 result.candidates 取得（根據 API 回應格式）
+        console.log('🔍 Attempting to get response via candidates...');
+        const candidates = (result as any).candidates;
+        
+        if (candidates && candidates.length > 0) {
+          const firstCandidate = candidates[0];
+          if (firstCandidate.content && firstCandidate.content.parts) {
+            responseText = firstCandidate.content.parts
+              .map((p: any) => p.text || '')
+              .join('');
+            console.log('✅ Got response text via candidates');
+          } else {
+            throw new Error('Candidate structure invalid');
+          }
+        } else {
+          throw new Error('No candidates found');
+        }
+      } catch (error2) {
+        console.error('❌ Method 2 also failed:', error2);
+        throw new Error(`無法取得 Gemini 回應：${error1 instanceof Error ? error1.message : String(error1)}`);
+      }
+    }
+    
+    console.log('📝 Gemini API response received:', {
+      hasText: !!responseText,
       textLength: responseText?.length || 0,
       textPreview: responseText?.substring(0, 50) || 'N/A',
     });
     
     // 如果回應為空
     if (!responseText || responseText.trim().length === 0) {
-      console.warn('Gemini returned empty response');
+      console.warn('⚠️  Gemini returned empty response');
       return '抱歉，我無法產生回應。請稍後再試。';
     }
     
-    console.log('Gemini API response text length:', responseText.length);
-    console.log('Gemini API response preview:', responseText.substring(0, 100));
+    console.log('✅ Gemini API response text length:', responseText.length);
+    console.log('✅ Gemini API response preview:', responseText.substring(0, 100));
     return responseText;
   } catch (error) {
     console.error('Gemini API error:', error);

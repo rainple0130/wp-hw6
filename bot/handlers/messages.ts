@@ -38,6 +38,21 @@ export async function handleTextMessage(context: LineContext) {
       messageType: rawEvent.type === 'message' ? rawEvent.message?.type : 'N/A'
     });
 
+    // 開發階段：先 echo 收到的訊息（必須在所有處理前發送）
+    console.log('Echoing received message:', originalText);
+    try {
+      await context.sendText(`收到：${originalText}`);
+      console.log('Echo message sent successfully');
+    } catch (echoError) {
+      console.error('Failed to send echo message:', echoError);
+      // 如果是 socket hang up，可能是 LINE API 暫時問題，繼續處理
+      if (echoError instanceof Error && echoError.message.includes('socket hang up')) {
+        console.warn('LINE API socket hang up on echo, continuing...');
+      } else {
+        // 其他錯誤，記錄但不中斷
+        console.error('Echo error details:', echoError);
+      }
+    }
     // DEBUG 特殊語法：直接回應，不呼叫 Gemini
     const trimmedText = text.trim();
     console.log('🔍 Checking for DEBUG command, trimmed text:', trimmedText);
@@ -60,21 +75,6 @@ export async function handleTextMessage(context: LineContext) {
       return;
     }
 
-    // 開發階段：先 echo 收到的訊息（必須在所有處理前發送）
-    console.log('Echoing received message:', originalText);
-    try {
-      await context.sendText(`收到：${originalText}`);
-      console.log('Echo message sent successfully');
-    } catch (echoError) {
-      console.error('Failed to send echo message:', echoError);
-      // 如果是 socket hang up，可能是 LINE API 暫時問題，繼續處理
-      if (echoError instanceof Error && echoError.message.includes('socket hang up')) {
-        console.warn('LINE API socket hang up on echo, continuing...');
-      } else {
-        // 其他錯誤，記錄但不中斷
-        console.error('Echo error details:', echoError);
-      }
-    }
 
     // 基本問候 - 檢查多種可能的寫法
     if (text.includes('你好') || text.includes('hello') || text.includes('hi') || text === 'hello' || text === 'hi') {
